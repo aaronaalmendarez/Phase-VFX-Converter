@@ -17,6 +17,8 @@ def fetch_and_slice(asset_id, cols, rows, target_id, is_group, api_key):
         res = requests.get(f"https://assetdelivery.roblox.com/v1/asset/?id={asset_id}")
         
         if res.status_code != 200:
+            if res.status_code in (401, 403):
+                return {"success": False, "error": "This asset is Private (Not 'Free to Copy'). Roblox blocks apps from downloading private assets without login cookies. You must make it public first, or use a local file."}
             return {"success": False, "error": f"Failed to fetch asset: {res.status_code}"}
             
         # Parse XML for decal URL if necessary
