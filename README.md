@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="https://raw.githubusercontent.com/aaronaalmendarez/Phase-VFX-Converter/main/web/icons/icon.png" width="80" alt="Phase VFX Logo" />
+  <img src="web/icons/icon.png" width="80" alt="Phase VFX Logo" />
   <h1>Phase VFX Flipbook Converter</h1>
   <p><b>The ultimate companion app for VFXForge. Seamlessly slice, upload, and import frames directly into your Roblox Studio VFX library.</b></p>
 
