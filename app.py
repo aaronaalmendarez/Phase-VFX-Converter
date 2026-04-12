@@ -5,9 +5,46 @@ import time
 import requests
 import base64
 import json
+import re
 from PIL import Image
 
 eel.init('web')
+
+@eel.expose
+def fetch_and_slice(asset_id, cols, rows, target_id, is_group, api_key):
+    try:
+        eel.update_progress(0, 1, f"Fetching Asset ID {asset_id} from Roblox servers...")
+        res = requests.get(f"https://assetdelivery.roblox.com/v1/asset/?id={asset_id}")
+        
+        if res.status_code != 200:
+            return {"success": False, "error": f"Failed to fetch asset: {res.status_code}"}
+            
+        # Parse XML for decal URL if necessary
+        content = res.text
+        if content.startswith("<roblox"):
+            match = re.search(r'<url>(.*?)</url>', content)
+            if not match:
+                return {"success": False, "error": "Could not extract image URL from Decal XML."}
+            image_url = match.group(1).replace("&amp;", "&")
+            img_res = requests.get(image_url)
+            if img_res.status_code != 200:
+                return {"success": False, "error": f"Failed to fetch extracted image: {img_res.status_code}"}
+            img_bytes = img_res.content
+        else:
+            img_bytes = res.content
+            
+        eel.update_progress(1, 1, "Image fetched successfully. Prepping for slicing...")
+        
+        # Convert to base64 so we can cleanly reuse the exact same robust slice_and_upload logic
+        b64_string = base64.b64encode(img_bytes).decode('utf-8')
+        data_uri = f"data:image/png;base64,{b64_string}"
+        
+        return slice_and_upload(data_uri, cols, rows, target_id, is_group, api_key)
+        
+    except Exception as e:
+        import traceback
+        eel.log_error(str(e))
+        return {"success": False, "error": str(e)}
 
 @eel.expose
 def slice_and_upload(image_base64, cols, rows, target_id, is_group, api_key):

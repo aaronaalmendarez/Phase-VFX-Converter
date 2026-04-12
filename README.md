@@ -62,9 +62,15 @@ Using the tool is incredibly straightforward.
 * **Creator ID:** Your Roblox User ID or your Group's ID (found in the URL when looking at your profile).
 
 ### 3. Slice and Upload ✂️
+You have two options to import your spritesheets:
+
+**Option A: Local Image (Drag & Drop)**
 Upload your `.PNG` Spritesheet, type in how many Rows and Columns the image has, and hit **Slice & Upload!** 
 
-The app will securely communicate with Roblox and upload every individual frame as a native Decal to your account. 
+**Option B: Remote Asset ID (Zero Downloads)**
+Found an existing, public spritesheet on Roblox? Just paste the Decal's `Asset ID` directly into the converter, set the Rows and Columns, and hit **Fetch & Slice!** The app will securely download the image directly from Roblox's CDNs, slice it, and instantly republish the 16+ frames directly into your inventory. 
+
+The app securely communicates directly with Roblox and uploads every individual frame as a native Decal to your account. 
 
 ### 4. Paste to Phase VFX! 🪄
 Once finished, the app will give you a neat little `[ Copy IDs ]` button. Click it, go to Roblox Studio, click the **Importer Tab** inside Phase VFX, and paste! All of your frames will instantly categorize themselves into your personal flipbook library! 

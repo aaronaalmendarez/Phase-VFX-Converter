@@ -241,6 +241,20 @@
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                     Slice & Upload
                 </button>
+
+                <div class="cloud-import-section" style="margin-top: 24px; text-align: center;">
+                    <div style="margin-bottom: 12px; color: #8F8F9D; font-size: 14px; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                        <span style="flex: 1; height: 1px; background: rgba(255,255,255,0.1);"></span>
+                        <span>or slice an existing Roblox decal</span>
+                        <span style="flex: 1; height: 1px; background: rgba(255,255,255,0.1);"></span>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <input type="text" id="cloudAssetId" placeholder="Paste Asset ID (e.g. 123456789)" style="flex: 1; padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.2); color: white; font-family: inherit;">
+                        <button class="upload-btn" style="width: auto; padding: 0 16px; margin: 0; display: flex;" onclick="startCloudUpload()">
+                            Fetch & Slice
+                        </button>
+                    </div>
+                </div>
             </div>
 
             <!-- State: Uploading -->
