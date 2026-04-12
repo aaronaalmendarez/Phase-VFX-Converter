@@ -30,10 +30,45 @@ jobs:
 
     - name: Build with PyInstaller
       run: |
-        python -m eel app.py web --onefile --noconsole --name "PhaseConverter"
+        python -m eel app.py web --onefile --noconsole --name "PhaseConverter" --icon NONE
 
-    - name: Upload Artifacts
+    - name: Create DMG (macOS)
+      if: matrix.os == 'macos-latest'
+      run: |
+        brew install create-dmg
+        
+        # Pyinstaller outputs PhaseConverter.app to dist/
+        # Use create-dmg to bundle it
+        create-dmg \
+          --volname "Phase Converter" \
+          --window-size 500 300 \
+          --icon-size 100 \
+          --icon "PhaseConverter.app" 125 120 \
+          --hide-extension "PhaseConverter.app" \
+          --app-drop-link 375 120 \
+          dist/PhaseConverter-Mac.dmg \
+          dist/PhaseConverter.app
+
+    - name: Rename EXE (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        ren dist\PhaseConverter.exe PhaseConverter-Windows.exe
+
+    - name: Release to GitHub
+      uses: softprops/action-gh-release@v1
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        files: |
+          dist/PhaseConverter-Windows.exe
+          dist/PhaseConverter-Mac.dmg
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Upload Artifacts (Fallback)
+      if: "!startsWith(github.ref, 'refs/tags/')"
       uses: actions/upload-artifact@v3
       with:
         name: PhaseConverter-${{ matrix.os }}
-        path: dist/
+        path: |
+          dist/PhaseConverter-Windows.exe
+          dist/PhaseConverter-Mac.dmg
