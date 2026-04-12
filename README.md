@@ -11,6 +11,12 @@
 
 Welcome to the **Phase VFX Flipbook Converter**! This lightweight desktop tool connects with Roblox's Open Cloud API to securely upload large spritesheets directly into your Roblox inventory. It automatically slices your massive flipbooks into sequential frames and spits out an array of IDs that natively pastes into the VFXForge plugin. 
 
+<div align="center">
+  <br>
+  <img src="images/main_screen.png" width="600" alt="Phase VFX Converter Desktop App" />
+  <br>
+</div>
+
 ---
 
 ## ⚡ 1-Click Install (Easiest Method)
@@ -56,6 +62,12 @@ The app will securely communicate with Roblox and upload every individual frame 
 
 ### 4. Paste to VFXForge! 🪄
 Once finished, the app will give you a neat little `[ Copy IDs ]` button. Click it, go to Roblox Studio, click the **Importer Tab** inside Phase VFX, and paste! All of your frames will instantly categorize themselves into your personal flipbook library! 
+
+<div align="center">
+  <br>
+  <img src="images/plugin_importer.png" width="600" alt="VFXForge Plugin Importer UI" />
+  <br>
+</div>
 
 ---
 
