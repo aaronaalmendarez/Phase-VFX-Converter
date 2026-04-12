@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phase VFX Converter</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Global SVG Defs to prevent display:none bugs -->
+    <svg width="0" height="0" style="position: absolute;">
+        <defs>
+            <linearGradient id="iconGrad" x1="0" y1="0" x2="24" y2="24">
+                <stop offset="0%" stop-color="#DFCAFF"/>
+                <stop offset="100%" stop-color="#A48DD6"/>
+            </linearGradient>
+            <linearGradient id="spinGrad">
+                <stop offset="0%" stop-color="#DFCAFF"/>
+                <stop offset="100%" stop-color="#A48DD6"/>
+            </linearGradient>
+        </defs>
+    </svg>
+
+    <!-- ============ ONBOARDING OVERLAY ============ -->
+    <div id="onboarding" class="onboarding-overlay">
+        <div class="onboarding-backdrop"></div>
+        <div class="onboarding-card">
+            <div class="onboarding-glow"></div>
+
+            <!-- Step Indicators -->
+            <div class="step-dots">
+                <div class="dot active" data-step="0"></div>
+                <div class="dot" data-step="1"></div>
+                <div class="dot" data-step="2"></div>
+            </div>
+
+            <!-- Step 0: Welcome -->
+            <div class="step active" id="step0">
+                <div class="step-icon">
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="url(#iconGrad)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                    </svg>
+                </div>
+                <h2>Phase Flipbook Converter</h2>
+                <p>Turn any flipbook spritesheet into individual Roblox decals in seconds.</p>
+                <div class="welcome-features">
+                    <div class="feature-pill">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+                        Auto-slice any grid
+                    </div>
+                    <div class="feature-pill">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                        Upload directly to Roblox
+                    </div>
+                    <div class="feature-pill">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                        100% local &amp; private
+                    </div>
+                </div>
+                <button class="onboarding-btn" onclick="nextStep()">Get Started →</button>
+            </div>
+
+            <!-- Step 1: Get API Key -->
+            <div class="step" id="step1">
+                <div class="step-icon">
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="url(#iconGrad)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>
+                    </svg>
+                </div>
+                <h2>Quick Setup</h2>
+                <p>To upload frames to your Roblox account, you'll need an API key. It takes about 30 seconds.</p>
+
+                <a href="#" onclick="openExternal('https://create.roblox.com/dashboard/credentials')" class="open-link-btn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                    Open Roblox Creator Dashboard
+                </a>
+
+                <div class="instruction-steps">
+                    <div class="instruction">
+                        <span class="instruction-num">1</span>
+                        <div class="instruction-text">
+                            <strong>Create API Key</strong>
+                            <span class="instruction-sub">Click the blue "Create API Key" button</span>
+                        </div>
+                    </div>
+                    <div class="instruction">
+                        <span class="instruction-num">2</span>
+                        <div class="instruction-text">
+                            <strong>Name it anything</strong>
+                            <span class="instruction-sub">e.g. "Phase Converter" — this is just a label</span>
+                        </div>
+                    </div>
+                    <div class="instruction">
+                        <span class="instruction-num">3</span>
+                        <div class="instruction-text">
+                            <strong>Add Assets permission</strong>
+                            <span class="instruction-sub">Under "Access Permissions", select <em>Assets</em> → enable <em>Read</em> and <em>Write</em></span>
+                        </div>
+                    </div>
+                    <div class="instruction">
+                        <span class="instruction-num">4</span>
+                        <div class="instruction-text">
+                            <strong>Set Security (0.0.0.0/0)</strong>
+                            <span class="instruction-sub">Under "Security", add <em>0.0.0.0/0</em> as an accepted IP so it works from any computer</span>
+                        </div>
+                    </div>
+                    <div class="instruction">
+                        <span class="instruction-num">5</span>
+                        <div class="instruction-text">
+                            <strong>Copy the key</strong>
+                            <span class="instruction-sub">Click "Save & Generate Key", then copy it — you won't see it again!</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="btn-row">
+                    <button class="onboarding-btn secondary" onclick="prevStep()">Back</button>
+                    <button class="onboarding-btn" onclick="nextStep()">I have my key →</button>
+                </div>
+            </div>
+
+            <!-- Step 2: Paste Key -->
+            <div class="step" id="step2">
+                <div class="step-icon">
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="url(#iconGrad)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                    </svg>
+                </div>
+                <h2>Almost done!</h2>
+                <p>Paste the key you just copied. It never leaves your computer — it goes straight to Roblox.</p>
+                <div class="onboarding-input-wrap">
+                    <input type="password" id="onboardingKey" placeholder="Paste your API key here..." spellcheck="false" autocomplete="off">
+                    <button class="toggle-vis-btn" onclick="toggleKeyVis(this)" title="Show/Hide">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    </button>
+                </div>
+                <div class="trust-note">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                    Your key is stored locally in memory only. It is never saved to disk or sent to any server other than Roblox.
+                </div>
+                <div class="btn-row">
+                    <button class="onboarding-btn secondary" onclick="prevStep()">Back</button>
+                    <button class="onboarding-btn" onclick="finishOnboarding()" id="finishBtn">Start Converting →</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ MAIN APPLICATION ============ -->
+    <div class="app-container" id="mainApp">
+        <!-- Sidebar -->
+        <aside class="settings-panel">
+            <div class="sidebar-header">
+                <div class="logo-mark">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                </div>
+                <span class="logo-text">Phase Converter</span>
+            </div>
+
+            <div class="sidebar-section">
+                <div class="section-label">Authentication</div>
+                <div class="input-group">
+                    <label>API Key</label>
+                    <div class="input-with-icon">
+                        <input type="password" id="apiKey" placeholder="roblox_key_..." spellcheck="false" autocomplete="off">
+                        <button class="input-icon-btn" onclick="toggleKeyVis(this)" title="Show/Hide">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <div class="section-label">Target</div>
+                <div class="input-group">
+                    <label>Creator Type</label>
+                    <div class="segmented-control">
+                        <input type="radio" name="creatorType" id="radioUser" value="user" checked>
+                        <label for="radioUser">User</label>
+                        <input type="radio" name="creatorType" id="radioGroup" value="group">
+                        <label for="radioGroup">Group</label>
+                        <span class="segmented-thumb"></span>
+                    </div>
+                </div>
+                <div class="input-group">
+                    <label>Creator ID</label>
+                    <input type="number" id="creatorId" placeholder="Enter User or Group ID">
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <div class="section-label">Grid</div>
+                <div class="input-group">
+                    <label>Spritesheet Layout</label>
+                    <div class="grid-inputs">
+                        <div class="grid-field">
+                            <span class="grid-label">Cols</span>
+                            <input type="number" id="gridCols" value="4" min="1" max="64">
+                        </div>
+                        <span class="grid-x">×</span>
+                        <div class="grid-field">
+                            <span class="grid-label">Rows</span>
+                            <input type="number" id="gridRows" value="4" min="1" max="64">
+                        </div>
+                        <div class="grid-total" id="gridTotal">= 16 frames</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sidebar-footer">
+                <button class="help-btn" onclick="showOnboarding()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                    Setup Guide
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="content-panel">
+            <!-- State: Drop Zone -->
+            <div id="stateIdle" class="state-view active">
+                <div id="dropzone" class="dropzone">
+                    <div class="dropzone-ring"></div>
+                    <div class="dropzone-content" id="dropContent">
+                        <div class="drop-icon">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                <polyline points="17 8 12 3 7 8"/>
+                                <line x1="12" y1="3" x2="12" y2="15"/>
+                            </svg>
+                        </div>
+                        <h2>Drop your spritesheet here</h2>
+                        <p>or click to browse · PNG / JPG</p>
+                    </div>
+                    <img id="imagePreview" class="image-preview" />
+                </div>
+                <button id="uploadBtn" class="upload-btn" onclick="startUpload()">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                    Slice & Upload
+                </button>
+            </div>
+
+            <!-- State: Uploading -->
+            <div id="stateUploading" class="state-view">
+                <div class="upload-panel">
+                    <div class="upload-spinner">
+                        <svg viewBox="0 0 50 50" class="spinner-svg">
+                            <circle cx="25" cy="25" r="20" fill="none" stroke="url(#spinGrad)" stroke-width="3" stroke-linecap="round"/>
+                        </svg>
+                        <span class="spinner-percent" id="spinnerPercent">0%</span>
+                    </div>
+                    <h3 id="uploadStatusTitle">Slicing frames...</h3>
+                    <p class="upload-detail" id="uploadDetail">Preparing your spritesheet</p>
+                    <div class="progress-track">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <div class="frame-counter" id="frameCounter">0 / 0</div>
+                </div>
+            </div>
+
+            <!-- State: Complete -->
+            <div id="stateComplete" class="state-view">
+                <div class="complete-panel">
+                    <div class="success-icon">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                            <polyline points="22 4 12 14.01 9 11.01"/>
+                        </svg>
+                    </div>
+                    <h3>Upload Complete!</h3>
+                    <p class="complete-subtitle">All frames have been uploaded to Roblox</p>
+                    <textarea id="resultOutput" readonly></textarea>
+                    <div class="btn-row">
+                        <button class="action-btn secondary" onclick="resetToIdle()">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+                            New Upload
+                        </button>
+                        <button class="action-btn primary" onclick="copyResults()">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                            Copy IDs
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- ============ TOAST ============ -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <script type="text/javascript" src="/eel.js"></script>
+    <script src="main.js"></script>
+</body>
+</html>
