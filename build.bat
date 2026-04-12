@@ -1,6 +1,6 @@
 @echo off
 echo Building PhaseConverter Desktop App...
 call venv\Scripts\activate.bat
-python -m eel app.py web --onefile --noconsole --name "PhaseConverter" --icon NONE
+pyinstaller --onefile --noconsole --name "PhaseConverter" --icon NONE --add-data "web;web" app.py
 echo Build Complete! Check the "dist" folder.
 pause
