@@ -1,10 +1,10 @@
 <div align="center">
   <img src="https://raw.githubusercontent.com/aaronaalmendarez/Phase-VFX-Converter/main/web/icons/icon.png" width="80" alt="Phase VFX Logo" />
   <h1>Phase VFX Flipbook Converter</h1>
-  <p><b>The ultimate companion app for VFXForge. Seamlessly slice, upload, and import spritesheets directly into your Roblox Studio VFX library.</b></p>
+  <p><b>The ultimate companion app for VFXForge. Seamlessly slice, upload, and import frames directly into your Roblox Studio VFX library.</b></p>
 
   [![License: MIT](https://img.shields.io/badge/License-MIT-purple.svg)](https://opensource.org/licenses/MIT)
-  [![Made for Roblox](https://img.shields.io/badge/Roblox-VFXForge-black?logo=roblox)](https://create.roblox.com/)
+  [![Made for Roblox](https://img.shields.io/badge/Roblox-Phase_VFX-black?logo=roblox)](https://create.roblox.com/store/asset/78798609925417/Phase-VFX)
 </div>
 
 <br>
