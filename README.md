@@ -1,7 +1,7 @@
 <div align="center">
   <img src="web/icons/icon.png" width="80" alt="Phase VFX Logo" />
   <h1>Phase VFX Flipbook Converter</h1>
-  <p><b>The ultimate companion app for VFXForge. Seamlessly slice, upload, and import frames directly into your Roblox Studio VFX library.</b></p>
+  <p><b>The ultimate companion app for Phase VFX. Seamlessly slice, upload, and import frames directly into your Roblox Studio VFX library.</b></p>
 
   [![License: MIT](https://img.shields.io/badge/License-MIT-purple.svg)](https://opensource.org/licenses/MIT)
   [![Made for Roblox](https://img.shields.io/badge/Roblox-Phase_VFX-black?logo=roblox)](https://create.roblox.com/store/asset/78798609925417/Phase-VFX)
@@ -9,7 +9,7 @@
 
 <br>
 
-Welcome to the **Phase VFX Flipbook Converter**! This lightweight desktop tool connects with Roblox's Open Cloud API to securely upload large spritesheets directly into your Roblox inventory. It automatically slices your massive flipbooks into sequential frames and spits out an array of IDs that natively pastes into the VFXForge plugin. 
+Welcome to the **Phase VFX Flipbook Converter**! This lightweight desktop tool connects with Roblox's Open Cloud API to securely upload large spritesheets directly into your Roblox inventory. It automatically slices your massive flipbooks into sequential frames and spits out an array of IDs that natively pastes into the Phase VFX plugin. 
 
 <div align="center">
   <br>
@@ -21,23 +21,29 @@ Welcome to the **Phase VFX Flipbook Converter**! This lightweight desktop tool c
 
 ## ⚡ 1-Click Install (Easiest Method)
 
-If you don't want to deal with code, terminals, or manual setups, use this method!
+If you don't want to deal with code, terminal execution, or installing Python, use our pre-compiled standalone versions!
 
 #### 🖥️ For Windows Users
 1. Go to the [**Releases Tab**](../../releases) on the right side of this screen.
-2. Download the `Source code (zip)`.
-3. Extract the folder to your Desktop.
-4. Double-click the **`Start_Windows.bat`** file. 
-> *It will automatically install everything it needs and launch the app beautifully!*
+2. Download **`PhaseConverter.exe`**.
+3. Place it wherever you like (Desktop, Documents, etc).
+4. Double click it to run! No installation required.
 
 #### 🍎 For Mac Users
 1. Go to the [**Releases Tab**](../../releases) on the right side of this screen.
-2. Download the `Source code (zip)`.
-3. Extract the folder to somewhere safe.
-4. Double-click the **`Start_Mac.command`** file.
-> *If your Mac tells you it doesn't have permission to run, simply right click `Start_Mac.command` -> Open With -> Terminal.*
+2. Download **`PhaseConverter-Mac.dmg`**.
+3. Double click the `.dmg` file to mount it.
+4. Drag the PhaseConverter app into your Applications folder!
+> *If your Mac raises a security warning on the first opening, simply right-click the Application and hit "Open" instead of double-clicking!*
 
-*(Note: Both platforms require [Python](https://www.python.org/downloads/) to be installed prior to running the launchers! When installing Python on Windows, make sure you manually check the box that says "Add python.exe to PATH" at the bottom of the installer!)*
+---
+
+## 🛠️ Source Fallback Installation
+
+If the standalone app isn't working or you wish to run it natively via its python source:
+1. Download the `Source code (zip)` from the Releases tab and extract it.
+2. Double-click **`Start_Windows.bat`** (Windows) or **`Start_Mac.command`** (MacOS).
+> *Both platforms require [Python 3.10+](https://www.python.org/downloads/) to be installed prior to running the fallback script launchers!*
 
 ---
 
@@ -60,12 +66,12 @@ Upload your `.PNG` Spritesheet, type in how many Rows and Columns the image has,
 
 The app will securely communicate with Roblox and upload every individual frame as a native Decal to your account. 
 
-### 4. Paste to VFXForge! 🪄
+### 4. Paste to Phase VFX! 🪄
 Once finished, the app will give you a neat little `[ Copy IDs ]` button. Click it, go to Roblox Studio, click the **Importer Tab** inside Phase VFX, and paste! All of your frames will instantly categorize themselves into your personal flipbook library! 
 
 <div align="center">
   <br>
-  <img src="images/plugin_importer.png" width="600" alt="VFXForge Plugin Importer UI" />
+  <img src="images/plugin_importer.png" width="600" alt="Phase VFX Plugin Importer UI" />
   <br>
 </div>
 
