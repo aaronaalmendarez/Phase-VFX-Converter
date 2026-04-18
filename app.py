@@ -594,7 +594,7 @@ def remove_background(image_base64, method="dark", threshold=30, mask_params=Non
 
 
 @eel.expose
-def fetch_and_slice(asset_id, cols, rows, target_id, is_group, api_key):
+def fetch_and_slice(asset_id, cols, rows, target_id, is_group, api_key, name_prefix="Phase_VFX_Frame"):
     try:
         eel.update_progress(0, 1, f"Fetching Asset ID {asset_id} from Roblox servers...")
         res = requests.get(f"https://assetdelivery.roblox.com/v1/asset/?id={asset_id}")
@@ -622,14 +622,14 @@ def fetch_and_slice(asset_id, cols, rows, target_id, is_group, api_key):
         b64_string = base64.b64encode(img_bytes).decode('utf-8')
         data_uri = f"data:image/png;base64,{b64_string}"
         
-        return slice_and_upload(data_uri, cols, rows, target_id, is_group, api_key)
+        return slice_and_upload(data_uri, cols, rows, target_id, is_group, api_key, name_prefix)
         
     except Exception as e:
         eel.log_error(str(e))
         return {"success": False, "error": str(e)}
 
 @eel.expose
-def slice_and_upload(image_base64, cols, rows, target_id, is_group, api_key):
+def slice_and_upload(image_base64, cols, rows, target_id, is_group, api_key, name_prefix="Phase_VFX_Frame"):
     try:
         header, encoded = image_base64.split(",", 1)
         image_data = base64.b64decode(encoded)
@@ -673,7 +673,7 @@ def slice_and_upload(image_base64, cols, rows, target_id, is_group, api_key):
                 config = {
                     "assetType": "Decal",
                     "creationContext": target_context,
-                    "displayName": f"Phase_VFX_Frame_{frame_number}",
+                    "displayName": f"{name_prefix}_{frame_number}",
                     "description": "Uploaded via Phase-Flipbook-Editor"
                 }
                 

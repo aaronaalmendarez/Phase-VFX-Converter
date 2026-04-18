@@ -501,6 +501,31 @@ input[type="range"]:active::-webkit-slider-thumb {
     margin-bottom: 12px;
 }
 
+/* ---- Name Preview ---- */
+.name-preview {
+    background: var(--bg-input);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    padding: 8px 12px;
+    margin-top: 8px;
+}
+.name-preview-label {
+    display: block;
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.name-preview-example {
+    display: block;
+    font-size: 11.5px;
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    color: var(--accent-end);
+    word-break: break-all;
+    line-height: 1.5;
+}
 /* ============================================
    GPU INFO CARD + MODE TOGGLE
    ============================================ */

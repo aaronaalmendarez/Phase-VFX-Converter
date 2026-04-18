@@ -154,6 +154,7 @@ async function initSettings() {
             const radio = document.querySelector(`input[name="creator_type"][value="${s.creator_type}"]`);
             if (radio) radio.checked = true;
         }
+        if (s.frame_name_prefix) $('frame-name-prefix').value = s.frame_name_prefix;
     } catch (e) {
         console.warn('Failed to load settings:', e);
     }
@@ -166,7 +167,8 @@ function saveSettingsDebounced() {
         eel.save_settings({
             api_key: $('api-key').value,
             target_id: $('target-id').value,
-            creator_type: creatorRadio ? creatorRadio.value : 'User'
+            creator_type: creatorRadio ? creatorRadio.value : 'User',
+            frame_name_prefix: $('frame-name-prefix').value
         })();
     }, 500);
 }
@@ -174,6 +176,7 @@ function saveSettingsDebounced() {
 // Auto-save on input change
 $('api-key').addEventListener('input', saveSettingsDebounced);
 $('target-id').addEventListener('input', saveSettingsDebounced);
+$('frame-name-prefix').addEventListener('input', saveSettingsDebounced);
 document.querySelectorAll('input[name="creator_type"]').forEach(r => {
     r.addEventListener('change', saveSettingsDebounced);
 });
@@ -633,6 +636,24 @@ $('btn-bg-biref').onclick = async () => {
 // ============================================
 //  UPLOAD & REMOTE FETCH
 // ============================================
+// ---- Frame Name Preview ----
+function updateNamePreview() {
+    const prefix = $('frame-name-prefix').value || 'Phase_VFX_Frame';
+    const cols = parseInt($('grid-cols').value) || 1;
+    const rows = parseInt($('grid-rows').value) || 1;
+    const total = cols * rows;
+    let preview = '';
+    const show = Math.min(total, 3);
+    for (let i = 1; i <= show; i++) preview += `${prefix}_${i}, `;
+    if (total > 3) preview += '...';
+    else preview = preview.slice(0, -2);
+    $('name-preview-text').textContent = preview;
+}
+$('frame-name-prefix').addEventListener('input', updateNamePreview);
+$('grid-cols').addEventListener('change', updateNamePreview);
+$('grid-rows').addEventListener('change', updateNamePreview);
+updateNamePreview();
+
 $('btn-upload').onclick = async () => {
     if (!currentImageB64) return alert("Import an image first.");
     const apiKey   = $('api-key').value;
@@ -642,12 +663,13 @@ $('btn-upload').onclick = async () => {
     const isGroup = document.querySelector('input[name="creator_type"]:checked').value === "Group";
     const cols = parseInt($('grid-cols').value) || 1;
     const rows = parseInt($('grid-rows').value) || 1;
+    const namePrefix = $('frame-name-prefix').value || 'Phase_VFX_Frame';
 
     showProgress();
     $('results-area').classList.add('hidden');
-    log("Slicing and uploading to Roblox...");
+    log(`Slicing and uploading to Roblox as "${namePrefix}_1, ${namePrefix}_2, ..."...`);
 
-    const res = await eel.slice_and_upload(currentImageB64, cols, rows, targetId, isGroup, apiKey)();
+    const res = await eel.slice_and_upload(currentImageB64, cols, rows, targetId, isGroup, apiKey, namePrefix)();
 
     if (res.success && res.ids) {
         uploadedAssetIds = res.ids;
@@ -669,11 +691,12 @@ $('btn-fetch-remote').onclick = async () => {
     const isGroup = document.querySelector('input[name="creator_type"]:checked').value === "Group";
     const cols = parseInt($('grid-cols').value) || 1;
     const rows = parseInt($('grid-rows').value) || 1;
+    const namePrefix = $('frame-name-prefix').value || 'Phase_VFX_Frame';
 
     showProgress();
     log(`Fetching remote asset ${assetId}...`);
 
-    const res = await eel.fetch_and_slice(assetId, cols, rows, targetId, isGroup, apiKey)();
+    const res = await eel.fetch_and_slice(assetId, cols, rows, targetId, isGroup, apiKey, namePrefix)();
     if (res.success && res.ids) {
         uploadedAssetIds = res.ids;
         $('results-area').classList.remove('hidden');
