@@ -266,12 +266,75 @@
                 </div>
             </div>
 
-            <!-- Enlarged Animation Modal Overlay -->
+            <!-- Enlarged Animation Modal Overlay with Masking Tools -->
             <div id="anim-modal" class="anim-modal hidden">
                 <div class="anim-modal-bg"></div>
-                <div class="anim-modal-content">
-                    <canvas id="anim-modal-canvas"></canvas>
+                <div class="anim-modal-content mask-editor-layout">
                     <button id="btn-close-modal" class="modal-close-btn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 18L18 6M6 6l12 12"></path></svg></button>
+
+                    <!-- Left Toolbar -->
+                    <div class="mask-toolbar">
+                        <div class="mask-tool-group">
+                            <span class="mask-tool-label">Shape</span>
+                            <button class="mask-tool-btn active" id="mask-tool-ellipse" title="Ellipse Mask">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="12" rx="10" ry="7"/></svg>
+                            </button>
+                            <button class="mask-tool-btn" id="mask-tool-rect" title="Rectangle Mask">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/></svg>
+                            </button>
+                        </div>
+
+                        <div class="mask-tool-group">
+                            <span class="mask-tool-label">Mode</span>
+                            <button class="mask-tool-btn active" id="mask-mode-out" title="Mask Out (erase inside)">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/></svg>
+                            </button>
+                            <button class="mask-tool-btn" id="mask-mode-in" title="Mask In (keep inside only)">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg>
+                            </button>
+                        </div>
+
+                        <div class="mask-tool-group">
+                            <span class="mask-tool-label">Feather <span class="val-badge" id="val-mask-feather-kf">8</span></span>
+                            <input type="range" id="mask-feather-kf" min="0" max="60" value="8" step="1" class="mask-slider">
+                        </div>
+
+                        <div class="mask-tool-group" style="margin-top: auto; border-top: 1px solid var(--border-subtle); padding-top: 12px;">
+                            <button class="mask-tool-apply" id="btn-apply-mask">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 13l4 4L19 7"/></svg>
+                                Apply Mask
+                            </button>
+                            <button class="mask-tool-clear" id="btn-clear-mask">Clear All</button>
+                        </div>
+                    </div>
+
+                    <!-- Canvas Area -->
+                    <div class="mask-canvas-wrapper">
+                        <div class="mask-canvas-area" id="mask-canvas-area">
+                            <canvas id="anim-modal-canvas"></canvas>
+                            <canvas id="mask-overlay-canvas"></canvas>
+                        </div>
+
+                        <!-- Keyframe Timeline -->
+                        <div class="mask-timeline">
+                            <div class="mask-timeline-controls">
+                                <button class="mask-tl-btn" id="mask-tl-prev" title="Previous Frame">
+                                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+                                </button>
+                                <span class="mask-tl-frame" id="mask-tl-frame-label">Frame 1 / 64</span>
+                                <button class="mask-tl-btn" id="mask-tl-next" title="Next Frame">
+                                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 6h2v12h-2zM6 18l8.5-6L6 6z"/></svg>
+                                </button>
+                            </div>
+                            <div class="mask-timeline-track" id="mask-timeline-track">
+                                <!-- Frame cells dynamically generated -->
+                            </div>
+                            <div class="mask-timeline-actions">
+                                <button class="mask-tl-action" id="btn-add-keyframe"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg> Set Key</button>
+                                <button class="mask-tl-action danger" id="btn-del-keyframe"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/></svg> Del Key</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
             

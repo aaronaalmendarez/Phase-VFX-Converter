@@ -317,23 +317,31 @@ function updateStatBar(w, h) {
 // ============================================
 //  ANIMATION PREVIEW
 // ============================================
+let _animSpriteImg = null; // Cached decoded spritesheet for anim rendering
+
+function _getFrameGeometry() {
+    const cols = parseInt($('grid-cols').value) || 1;
+    const rows = parseInt($('grid-rows').value) || 1;
+    const total = cols * rows;
+    return { cols, rows, total };
+}
+
 function startAnim() {
     if (animTimer) clearInterval(animTimer);
     if (!currentImageB64 || !isPlaying) return;
 
-    const cols = parseInt($('grid-cols').value) || 1;
-    const rows = parseInt($('grid-rows').value) || 1;
+    const { cols, rows, total } = _getFrameGeometry();
     const fps  = parseInt($('anim-fps').value) || 30;
 
     const img = new Image();
     img.src = currentImageB64;
+    _animSpriteImg = img;
 
     animTimer = setInterval(() => {
         if (!img.complete || img.naturalWidth === 0) return;
 
         const fw = img.width / cols;
         const fh = img.height / rows;
-        const total = cols * rows;
         currentFrame = (currentFrame + 1) % total;
 
         const r = Math.floor(currentFrame / cols);
@@ -344,28 +352,33 @@ function startAnim() {
         animCtx.clearRect(0, 0, 48, 48);
         animCtx.drawImage(img, c * fw, r * fh, fw, fh, 0, 0, 48, 48);
 
-        // Render to modal if active
+        // Render to modal if active AND not in mask-editing mode
         const modal = $('anim-modal');
-        if (!modal.classList.contains('hidden')) {
-            const mCanvas = $('anim-modal-canvas');
-            const mCtx = mCanvas.getContext('2d');
-            
-            // Calculate a good enlarged size (up to 400px but respecting aspect ratio)
-            const maxDim = 512;
-            const scale = Math.min(maxDim / fw, maxDim / fh);
-            const wScaled = fw * scale;
-            const hScaled = fh * scale;
-
-            if (mCanvas.width !== wScaled || mCanvas.height !== hScaled) {
-                mCanvas.width = wScaled;
-                mCanvas.height = hScaled;
-                mCtx.imageSmoothingEnabled = false; // pixel art scaling
-            }
-
-            mCtx.clearRect(0, 0, wScaled, hScaled);
-            mCtx.drawImage(img, c * fw, r * fh, fw, fh, 0, 0, wScaled, hScaled);
+        if (!modal.classList.contains('hidden') && !maskEditor.active) {
+            _renderModalFrame(img, fw, fh, cols);
         }
     }, 1000 / fps);
+}
+
+// Renders a single frame to the modal canvas at correct scale
+function _renderModalFrame(img, fw, fh, cols) {
+    const mCanvas = $('anim-modal-canvas');
+    const mCtx = mCanvas.getContext('2d');
+    const maxDim = 512;
+    const scale = Math.min(maxDim / fw, maxDim / fh);
+    const wScaled = Math.round(fw * scale);
+    const hScaled = Math.round(fh * scale);
+
+    if (mCanvas.width !== wScaled || mCanvas.height !== hScaled) {
+        mCanvas.width = wScaled;
+        mCanvas.height = hScaled;
+        mCtx.imageSmoothingEnabled = false;
+    }
+
+    const r = Math.floor(currentFrame / cols);
+    const c = currentFrame % cols;
+    mCtx.clearRect(0, 0, wScaled, hScaled);
+    mCtx.drawImage(img, c * fw, r * fh, fw, fh, 0, 0, wScaled, hScaled);
 }
 
 $('grid-cols').onchange = () => { if (currentImageB64) updateCanvas(currentImageB64); };
@@ -380,31 +393,422 @@ $('btn-play-pause').onclick = () => {
 };
 
 // ============================================
-//  DRAG AND DROP
+//  MASK EDITOR ENGINE
 // ============================================
-const dropOverlay = $('drop-zone-overlay');
+const maskEditor = {
+    active: false,          // Is the modal in mask-edit mode?
+    shape: 'ellipse',       // 'ellipse' | 'rect'
+    mode: 'out',            // 'out' = erase inside, 'in' = keep inside only
+    feather: 8,
+    currentFrame: 0,        // Which frame we're viewing/editing in the modal
+    keyframes: {},          // { [frameIndex]: { x, y, w, h } } in normalized 0-1 coords
+    dragging: false,
+    resizing: false,
+    resizeHandle: null,     // 'nw','ne','sw','se'
+    dragStart: { x: 0, y: 0, ox: 0, oy: 0, ow: 0, oh: 0 },
+    // Current shape being drawn/displayed (normalized 0-1 coords)
+    current: { x: 0.25, y: 0.25, w: 0.5, h: 0.5 },
+};
 
-document.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    if (e.dataTransfer && e.dataTransfer.types && e.dataTransfer.types.includes("Files")) {
-        dropOverlay.classList.remove('hidden');
+// ---- Tool Button Wiring ----
+$('mask-tool-ellipse').onclick = () => {
+    maskEditor.shape = 'ellipse';
+    $('mask-tool-ellipse').classList.add('active');
+    $('mask-tool-rect').classList.remove('active');
+    _renderMaskOverlay();
+};
+$('mask-tool-rect').onclick = () => {
+    maskEditor.shape = 'rect';
+    $('mask-tool-rect').classList.add('active');
+    $('mask-tool-ellipse').classList.remove('active');
+    _renderMaskOverlay();
+};
+$('mask-mode-out').onclick = () => {
+    maskEditor.mode = 'out';
+    $('mask-mode-out').classList.add('active');
+    $('mask-mode-in').classList.remove('active');
+    _renderMaskOverlay();
+};
+$('mask-mode-in').onclick = () => {
+    maskEditor.mode = 'in';
+    $('mask-mode-in').classList.add('active');
+    $('mask-mode-out').classList.remove('active');
+    _renderMaskOverlay();
+};
+$('mask-feather-kf').oninput = function() {
+    maskEditor.feather = parseInt(this.value);
+    $('val-mask-feather-kf').textContent = this.value;
+};
+
+// ---- Timeline Navigation ----
+function _maskTotalFrames() {
+    return _getFrameGeometry().total;
+}
+
+function _maskGoToFrame(idx) {
+    const total = _maskTotalFrames();
+    maskEditor.currentFrame = Math.max(0, Math.min(idx, total - 1));
+
+    // Load interpolated shape for this frame
+    maskEditor.current = _interpolateMask(maskEditor.currentFrame);
+
+    // Render the frame on the modal canvas
+    _renderMaskEditFrame();
+    _renderMaskOverlay();
+    _updateTimelineUI();
+}
+
+$('mask-tl-prev').onclick = () => _maskGoToFrame(maskEditor.currentFrame - 1);
+$('mask-tl-next').onclick = () => _maskGoToFrame(maskEditor.currentFrame + 1);
+
+// ---- Keyframe Management ----
+$('btn-add-keyframe').onclick = () => {
+    maskEditor.keyframes[maskEditor.currentFrame] = { ...maskEditor.current };
+    _updateTimelineUI();
+    log(`Mask keyframe set at frame ${maskEditor.currentFrame + 1}`);
+};
+
+$('btn-del-keyframe').onclick = () => {
+    delete maskEditor.keyframes[maskEditor.currentFrame];
+    _updateTimelineUI();
+    log(`Mask keyframe removed at frame ${maskEditor.currentFrame + 1}`);
+};
+
+$('btn-clear-mask').onclick = () => {
+    maskEditor.keyframes = {};
+    maskEditor.current = { x: 0.25, y: 0.25, w: 0.5, h: 0.5 };
+    _updateTimelineUI();
+    _renderMaskOverlay();
+    log('All mask keyframes cleared.');
+};
+
+// ---- Linear Interpolation Between Keyframes ----
+function _interpolateMask(frameIdx) {
+    const keys = Object.keys(maskEditor.keyframes).map(Number).sort((a, b) => a - b);
+    if (keys.length === 0) return { ...maskEditor.current };
+    if (keys.length === 1) return { ...maskEditor.keyframes[keys[0]] };
+
+    // Exact keyframe match
+    if (maskEditor.keyframes[frameIdx]) return { ...maskEditor.keyframes[frameIdx] };
+
+    // Find surrounding keyframes
+    let prevKey = null, nextKey = null;
+    for (const k of keys) {
+        if (k <= frameIdx) prevKey = k;
+        if (k >= frameIdx && nextKey === null) nextKey = k;
+    }
+
+    // Clamp to edges
+    if (prevKey === null) return { ...maskEditor.keyframes[nextKey] };
+    if (nextKey === null) return { ...maskEditor.keyframes[prevKey] };
+    if (prevKey === nextKey) return { ...maskEditor.keyframes[prevKey] };
+
+    // Lerp
+    const t = (frameIdx - prevKey) / (nextKey - prevKey);
+    const a = maskEditor.keyframes[prevKey];
+    const b = maskEditor.keyframes[nextKey];
+    return {
+        x: a.x + (b.x - a.x) * t,
+        y: a.y + (b.y - a.y) * t,
+        w: a.w + (b.w - a.w) * t,
+        h: a.h + (b.h - a.h) * t,
+    };
+}
+
+// ---- Render Functions ----
+function _renderMaskEditFrame() {
+    if (!_animSpriteImg || !_animSpriteImg.complete) return;
+    const { cols, rows } = _getFrameGeometry();
+    const img = _animSpriteImg;
+    const fw = img.width / cols;
+    const fh = img.height / rows;
+    _renderModalFrame(img, fw, fh, cols);
+}
+
+function _renderMaskOverlay() {
+    const mCanvas = $('anim-modal-canvas');
+    const overlay = $('mask-overlay-canvas');
+    if (!mCanvas || !overlay) return;
+
+    // Sync overlay size and position to match the animated canvas
+    overlay.width = mCanvas.width;
+    overlay.height = mCanvas.height;
+    overlay.style.width = mCanvas.style.width || mCanvas.width + 'px';
+    overlay.style.height = mCanvas.style.height || mCanvas.height + 'px';
+
+    const octx = overlay.getContext('2d');
+    const w = overlay.width;
+    const h = overlay.height;
+    octx.clearRect(0, 0, w, h);
+
+    if (Object.keys(maskEditor.keyframes).length === 0 && !maskEditor.dragging) return;
+
+    const m = maskEditor.current;
+    const px = m.x * w, py = m.y * h, pw = m.w * w, ph = m.h * h;
+
+    if (maskEditor.mode === 'out') {
+        // Draw the shape as a red semi-transparent zone indicating what will be erased
+        octx.fillStyle = 'rgba(255, 60, 60, 0.25)';
+        octx.strokeStyle = 'rgba(255, 60, 60, 0.8)';
+    } else {
+        // Draw the OUTSIDE as darkened (everything NOT inside will be erased)
+        octx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+        octx.fillRect(0, 0, w, h);
+        // Cut out the mask shape to show what's kept
+        octx.globalCompositeOperation = 'destination-out';
+        octx.fillStyle = 'rgba(0,0,0,1)';
+        if (maskEditor.shape === 'ellipse') {
+            octx.beginPath();
+            octx.ellipse(px + pw / 2, py + ph / 2, pw / 2, ph / 2, 0, 0, Math.PI * 2);
+            octx.fill();
+        } else {
+            octx.fillRect(px, py, pw, ph);
+        }
+        octx.globalCompositeOperation = 'source-over';
+        // Draw border for the kept region
+        octx.strokeStyle = 'rgba(52, 211, 153, 0.8)';
+    }
+
+    octx.lineWidth = 2;
+    octx.setLineDash([6, 4]);
+
+    if (maskEditor.mode === 'out') {
+        if (maskEditor.shape === 'ellipse') {
+            octx.beginPath();
+            octx.ellipse(px + pw / 2, py + ph / 2, pw / 2, ph / 2, 0, 0, Math.PI * 2);
+            octx.fill();
+            octx.stroke();
+        } else {
+            octx.fillRect(px, py, pw, ph);
+            octx.strokeRect(px, py, pw, ph);
+        }
+    } else {
+        // Just stroke the outline for mask-in
+        if (maskEditor.shape === 'ellipse') {
+            octx.beginPath();
+            octx.ellipse(px + pw / 2, py + ph / 2, pw / 2, ph / 2, 0, 0, Math.PI * 2);
+            octx.stroke();
+        } else {
+            octx.strokeRect(px, py, pw, ph);
+        }
+    }
+
+    octx.setLineDash([]);
+
+    // Draw 4 resize handles (corners)
+    const handleSize = 7;
+    octx.fillStyle = '#fff';
+    octx.strokeStyle = 'rgba(0,0,0,0.6)';
+    octx.lineWidth = 1;
+    const corners = [
+        [px, py], [px + pw, py],
+        [px, py + ph], [px + pw, py + ph]
+    ];
+    for (const [cx, cy] of corners) {
+        octx.fillRect(cx - handleSize / 2, cy - handleSize / 2, handleSize, handleSize);
+        octx.strokeRect(cx - handleSize / 2, cy - handleSize / 2, handleSize, handleSize);
+    }
+}
+
+// ---- Timeline UI ----
+function _buildTimeline() {
+    const track = $('mask-timeline-track');
+    if (!track) return;
+    track.innerHTML = '';
+    const total = _maskTotalFrames();
+    for (let i = 0; i < total; i++) {
+        const cell = document.createElement('div');
+        cell.className = 'mask-tl-cell';
+        cell.dataset.frame = i;
+        cell.style.flex = `1 0 ${Math.max(4, Math.min(12, 600 / total))}px`;
+        cell.onclick = () => _maskGoToFrame(i);
+        track.appendChild(cell);
+    }
+    _updateTimelineUI();
+}
+
+function _updateTimelineUI() {
+    const total = _maskTotalFrames();
+    $('mask-tl-frame-label').textContent = `Frame ${maskEditor.currentFrame + 1} / ${total}`;
+
+    const cells = $('mask-timeline-track').querySelectorAll('.mask-tl-cell');
+    cells.forEach((cell, i) => {
+        cell.classList.toggle('active', i === maskEditor.currentFrame);
+        cell.classList.toggle('has-keyframe', maskEditor.keyframes[i] !== undefined);
+    });
+}
+
+// ---- Mouse Interaction on Overlay Canvas ----
+const _overlayEl = () => $('mask-overlay-canvas');
+
+function _getOverlayMousePos(e) {
+    const rect = _overlayEl().getBoundingClientRect();
+    return {
+        x: (e.clientX - rect.left) / rect.width,
+        y: (e.clientY - rect.top) / rect.height
+    };
+}
+
+function _hitTestHandle(mx, my) {
+    const m = maskEditor.current;
+    const tolerance = 0.03; // 3% of canvas
+    const corners = {
+        'nw': [m.x, m.y],
+        'ne': [m.x + m.w, m.y],
+        'sw': [m.x, m.y + m.h],
+        'se': [m.x + m.w, m.y + m.h],
+    };
+    for (const [handle, [cx, cy]] of Object.entries(corners)) {
+        if (Math.abs(mx - cx) < tolerance && Math.abs(my - cy) < tolerance) {
+            return handle;
+        }
+    }
+    return null;
+}
+
+function _hitTestBody(mx, my) {
+    const m = maskEditor.current;
+    return mx >= m.x && mx <= m.x + m.w && my >= m.y && my <= m.y + m.h;
+}
+
+// Event delegation on the overlay canvas
+document.addEventListener('mousedown', (e) => {
+    if (!maskEditor.active) return;
+    if (e.target !== _overlayEl()) return;
+
+    const pos = _getOverlayMousePos(e);
+    const handle = _hitTestHandle(pos.x, pos.y);
+
+    if (handle) {
+        maskEditor.resizing = true;
+        maskEditor.resizeHandle = handle;
+        maskEditor.dragStart = { x: pos.x, y: pos.y, ox: maskEditor.current.x, oy: maskEditor.current.y, ow: maskEditor.current.w, oh: maskEditor.current.h };
+    } else if (_hitTestBody(pos.x, pos.y)) {
+        maskEditor.dragging = true;
+        maskEditor.dragStart = { x: pos.x, y: pos.y, ox: maskEditor.current.x, oy: maskEditor.current.y, ow: maskEditor.current.w, oh: maskEditor.current.h };
+    } else {
+        // Click outside = start drawing a new shape from this point
+        maskEditor.dragging = false;
+        maskEditor.resizing = true;
+        maskEditor.resizeHandle = 'se';
+        maskEditor.current.x = pos.x;
+        maskEditor.current.y = pos.y;
+        maskEditor.current.w = 0.01;
+        maskEditor.current.h = 0.01;
+        maskEditor.dragStart = { x: pos.x, y: pos.y, ox: pos.x, oy: pos.y, ow: 0.01, oh: 0.01 };
     }
 });
 
-// ============================================
-//  MODAL LOGIC
-// ============================================
+document.addEventListener('mousemove', (e) => {
+    if (!maskEditor.active) return;
+    if (!maskEditor.dragging && !maskEditor.resizing) return;
+
+    const pos = _getOverlayMousePos(e);
+    const dx = pos.x - maskEditor.dragStart.x;
+    const dy = pos.y - maskEditor.dragStart.y;
+    const s = maskEditor.dragStart;
+
+    if (maskEditor.dragging) {
+        maskEditor.current.x = s.ox + dx;
+        maskEditor.current.y = s.oy + dy;
+    } else if (maskEditor.resizing) {
+        const h = maskEditor.resizeHandle;
+        if (h === 'se') {
+            maskEditor.current.w = Math.max(0.02, s.ow + dx);
+            maskEditor.current.h = Math.max(0.02, s.oh + dy);
+        } else if (h === 'sw') {
+            maskEditor.current.x = s.ox + dx;
+            maskEditor.current.w = Math.max(0.02, s.ow - dx);
+            maskEditor.current.h = Math.max(0.02, s.oh + dy);
+        } else if (h === 'ne') {
+            maskEditor.current.y = s.oy + dy;
+            maskEditor.current.w = Math.max(0.02, s.ow + dx);
+            maskEditor.current.h = Math.max(0.02, s.oh - dy);
+        } else if (h === 'nw') {
+            maskEditor.current.x = s.ox + dx;
+            maskEditor.current.y = s.oy + dy;
+            maskEditor.current.w = Math.max(0.02, s.ow - dx);
+            maskEditor.current.h = Math.max(0.02, s.oh - dy);
+        }
+    }
+    _renderMaskOverlay();
+});
+
+document.addEventListener('mouseup', () => {
+    if (maskEditor.dragging || maskEditor.resizing) {
+        maskEditor.dragging = false;
+        maskEditor.resizing = false;
+    }
+});
+
+// ---- Modal Open/Close ----
 $('btn-enlarge-anim').onclick = () => {
     if (!currentImageB64) return;
     $('anim-modal').classList.remove('hidden');
-    startAnim();
+
+    // Cache the sprite image
+    const img = new Image();
+    img.src = currentImageB64;
+    img.onload = () => {
+        _animSpriteImg = img;
+        maskEditor.active = true;
+        maskEditor.currentFrame = 0;
+        _buildTimeline();
+        _maskGoToFrame(0);
+    };
 };
 
 const closeModal = () => {
     $('anim-modal').classList.add('hidden');
+    maskEditor.active = false;
 };
 $('btn-close-modal').onclick = closeModal;
 document.querySelector('.anim-modal-bg').onclick = closeModal;
+
+// ---- Apply Mask to Spritesheet (sends to Python backend) ----
+$('btn-apply-mask').onclick = async () => {
+    if (!currentImageB64) return;
+    const keys = Object.keys(maskEditor.keyframes);
+    if (keys.length === 0) {
+        log('No keyframes set. Draw a mask shape and click "Set Key" first.');
+        return;
+    }
+
+    const { cols, rows, total } = _getFrameGeometry();
+
+    // Generate interpolated mask data for every frame
+    const maskData = [];
+    for (let i = 0; i < total; i++) {
+        const m = _interpolateMask(i);
+        maskData.push({
+            x: m.x, y: m.y, w: m.w, h: m.h,
+            shape: maskEditor.shape,
+            mode: maskEditor.mode,
+            feather: maskEditor.feather
+        });
+    }
+
+    log('Applying mask keyframes to spritesheet...');
+    globalProgressShow('Baking masks...', 50);
+
+    const res = await eel.apply_keyframed_masks(currentImageB64, cols, rows, maskData)();
+    if (res.success) {
+        saveUndoState();
+        updateCanvas(res.image);
+        // Reload the sprite image in the editor
+        const img = new Image();
+        img.src = res.image;
+        img.onload = () => {
+            _animSpriteImg = img;
+            _renderMaskEditFrame();
+            _renderMaskOverlay();
+        };
+        log('Mask applied successfully to all frames!');
+    } else {
+        logError(res.error);
+    }
+    globalProgressDone();
+};
 
 // ============================================
 //  FILE IMPORT

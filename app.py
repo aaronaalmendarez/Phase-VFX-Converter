@@ -207,6 +207,91 @@ def video_b64_to_spritesheet(b64_data, max_frames=64, cols=8, filename="temp.mp4
         return res
     except Exception as e:
         return {"success": False, "error": str(e)}
+@eel.expose
+def apply_keyframed_masks(image_base64, cols, rows, mask_data):
+    """
+    Apply keyframed geometric masks to every frame of a spritesheet.
+    mask_data: list of dicts, one per frame:
+      { x, y, w, h, shape, mode, feather } where x/y/w/h are normalized 0-1
+    """
+    try:
+        header, encoded = image_base64.split(",", 1)
+        img = Image.open(io.BytesIO(base64.b64decode(encoded))).convert("RGBA")
+        
+        width, height = img.size
+        frame_w = width // cols
+        frame_h = height // rows
+        total_frames = cols * rows
+        
+        eel.update_progress(0, total_frames, "Applying masks...")
+        
+        frames = []
+        for i in range(total_frames):
+            r = i // cols
+            c = i % cols
+            left = c * frame_w
+            top = r * frame_h
+            
+            frame = img.crop((left, top, left + frame_w, top + frame_h)).copy()
+            
+            if i < len(mask_data):
+                md = mask_data[i]
+                # Convert normalized coords to pixel coords within this frame
+                mx = int(md['x'] * frame_w)
+                my = int(md['y'] * frame_h)
+                mw = int(md['w'] * frame_w)
+                mh = int(md['h'] * frame_h)
+                feather = int(md.get('feather', 0))
+                shape = md.get('shape', 'ellipse')
+                mode = md.get('mode', 'out')
+                
+                # Create the geometric mask (white = affected area)
+                mask = np.zeros((frame_h, frame_w), dtype=np.uint8)
+                
+                if shape == 'ellipse':
+                    center = (mx + mw // 2, my + mh // 2)
+                    axes = (max(1, mw // 2), max(1, mh // 2))
+                    cv2.ellipse(mask, center, axes, 0, 0, 360, 255, -1)
+                else:  # rect
+                    cv2.rectangle(mask, (mx, my), (mx + mw, my + mh), 255, -1)
+                
+                # Apply feathering via Gaussian blur
+                if feather > 0:
+                    ksize = feather * 2 + 1
+                    mask = cv2.GaussianBlur(mask, (ksize, ksize), 0)
+                
+                # Get the frame's current alpha channel
+                frame_arr = np.array(frame)
+                orig_alpha = frame_arr[:, :, 3].astype(np.float32)
+                mask_f = mask.astype(np.float32) / 255.0
+                
+                if mode == 'out':
+                    # Mask Out: erase pixels INSIDE the shape
+                    new_alpha = orig_alpha * (1.0 - mask_f)
+                else:
+                    # Mask In: keep ONLY pixels inside the shape
+                    new_alpha = orig_alpha * mask_f
+                
+                frame_arr[:, :, 3] = new_alpha.clip(0, 255).astype(np.uint8)
+                frame = Image.fromarray(frame_arr)
+            
+            frames.append(frame)
+            eel.update_progress(i + 1, total_frames, f"Masking frame {i + 1}/{total_frames}...")
+        
+        # Reassemble spritesheet
+        spritesheet = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+        for i, frame in enumerate(frames):
+            r = i // cols
+            c = i % cols
+            spritesheet.paste(frame, (c * frame_w, r * frame_h))
+        
+        buffered = io.BytesIO()
+        spritesheet.save(buffered, format="PNG")
+        b64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
+        
+        return {"success": True, "image": f"data:image/png;base64,{b64}"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
 
 @eel.expose
 def dissect_spritesheet(image_base64, cols, rows):

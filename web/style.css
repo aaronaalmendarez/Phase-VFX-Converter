@@ -1048,7 +1048,7 @@ canvas#preview-canvas {
 }
 
 /* ============================================
-   ENLARGED ANIMATION MODAL
+   ENLARGED ANIMATION MODAL — MASK EDITOR
    ============================================ */
 .anim-modal {
     position: absolute;
@@ -1069,27 +1069,260 @@ canvas#preview-canvas {
     cursor: zoom-out;
     animation: fadeIn 0.25s ease-out;
 }
-.anim-modal-content {
+
+/* ---- Mask Editor Layout (flex row: toolbar | canvas+timeline) ---- */
+.mask-editor-layout {
     position: relative;
     z-index: 2001;
-    background: var(--bg-elevated);
+    background: var(--bg-surface);
     border: 1px solid var(--border-medium);
     border-radius: var(--radius-lg);
-    padding: 16px;
     box-shadow: 0 20px 40px rgba(0,0,0,0.6), 0 0 40px var(--accent-glow);
     animation: popIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
-    max-width: 90vw;
+    max-width: 92vw;
     max-height: 90vh;
+    display: flex;
+    flex-direction: row;
+    overflow: hidden;
+}
+
+/* ---- Left Toolbar ---- */
+.mask-toolbar {
+    width: 140px;
+    min-width: 140px;
+    background: var(--bg-elevated);
+    border-right: 1px solid var(--border-subtle);
+    padding: 14px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+.mask-tool-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.mask-tool-label {
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.mask-tool-btn {
+    width: 100%;
+    height: 34px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
+    transition: all 0.15s;
 }
-.anim-modal-content canvas {
-    image-rendering: pixelated; /* Keeps pixel art sharp when scaled */
+.mask-tool-btn svg {
+    width: 18px;
+    height: 18px;
+}
+.mask-tool-btn:hover {
+    border-color: var(--accent-start);
+    color: var(--accent-mid);
+    background: var(--accent-surface);
+}
+.mask-tool-btn.active {
+    background: linear-gradient(135deg, rgba(124,58,237,0.2), rgba(168,85,247,0.12));
+    border-color: var(--accent-start);
+    color: var(--accent-mid);
+    box-shadow: inset 0 0 10px rgba(124,58,237,0.1);
+}
+.mask-slider {
+    width: 100%;
+    accent-color: var(--accent-mid);
+    height: 4px;
+}
+.mask-tool-apply {
+    width: 100%;
+    padding: 10px 0;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: linear-gradient(135deg, var(--accent-start), var(--accent-mid));
+    color: #fff;
+    font-weight: 600;
+    font-size: 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: all 0.2s;
+}
+.mask-tool-apply svg { width: 14px; height: 14px; }
+.mask-tool-apply:hover {
+    filter: brightness(1.15);
+    transform: translateY(-1px);
+}
+.mask-tool-clear {
+    width: 100%;
+    padding: 6px 0;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 10px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.mask-tool-clear:hover {
+    border-color: var(--danger);
+    color: var(--danger);
+}
+
+/* ---- Canvas Wrapper ---- */
+.mask-canvas-wrapper {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    overflow: hidden;
+}
+.mask-canvas-area {
+    flex: 1;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    overflow: hidden;
+    background: repeating-conic-gradient(rgba(255,255,255,0.03) 0% 25%, transparent 0% 50%) 50% / 16px 16px;
+}
+.mask-canvas-area canvas {
+    image-rendering: pixelated;
     max-width: 100%;
-    max-height: calc(90vh - 32px);
+    max-height: calc(74vh - 80px);
     border-radius: var(--radius-sm);
 }
+#mask-overlay-canvas {
+    position: absolute;
+    pointer-events: auto;
+    cursor: crosshair;
+}
+
+/* ---- Keyframe Timeline ---- */
+.mask-timeline {
+    background: var(--bg-elevated);
+    border-top: 1px solid var(--border-subtle);
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 52px;
+}
+.mask-timeline-controls {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+.mask-tl-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-sm);
+    background: var(--bg-input);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-secondary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+}
+.mask-tl-btn svg { width: 14px; height: 14px; }
+.mask-tl-btn:hover {
+    border-color: var(--accent-start);
+    color: var(--accent-mid);
+}
+.mask-tl-frame {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    min-width: 85px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+}
+.mask-timeline-track {
+    flex: 1;
+    display: flex;
+    gap: 1px;
+    height: 28px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    border-radius: var(--radius-sm);
+    background: var(--bg-input);
+    border: 1px solid var(--border-subtle);
+    padding: 2px;
+}
+.mask-timeline-track::-webkit-scrollbar { height: 3px; }
+.mask-tl-cell {
+    flex: 0 0 auto;
+    min-width: 8px;
+    height: 100%;
+    background: rgba(255,255,255,0.03);
+    border-radius: 2px;
+    cursor: pointer;
+    transition: background 0.1s;
+    position: relative;
+}
+.mask-tl-cell:hover { background: rgba(255,255,255,0.08); }
+.mask-tl-cell.active {
+    background: var(--accent-start);
+    box-shadow: 0 0 6px var(--accent-glow);
+}
+.mask-tl-cell.has-keyframe::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 50%;
+    transform: translateX(-50%) rotate(45deg);
+    width: 5px;
+    height: 5px;
+    background: var(--warning);
+    border-radius: 1px;
+}
+.mask-timeline-actions {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+}
+.mask-tl-action {
+    padding: 5px 10px;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    background: var(--bg-input);
+    color: var(--text-secondary);
+    font-size: 10px;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    transition: all 0.15s;
+    white-space: nowrap;
+}
+.mask-tl-action svg { width: 12px; height: 12px; }
+.mask-tl-action:hover {
+    border-color: var(--accent-start);
+    color: var(--accent-mid);
+}
+.mask-tl-action.danger:hover {
+    border-color: var(--danger);
+    color: var(--danger);
+}
+
 .modal-close-btn {
     position: absolute;
     top: -12px;
@@ -1105,6 +1338,7 @@ canvas#preview-canvas {
     justify-content: center;
     font-size: 18px;
     cursor: pointer;
+    z-index: 10;
     box-shadow: 0 4px 12px rgba(0,0,0,0.4);
     transition: all 0.2s;
 }
