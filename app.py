@@ -630,21 +630,20 @@ def remove_background(image_base64, method="dark", threshold=30, mask_params=Non
             base_alpha = np.max(rgb, axis=2)
             
             # 2. Apply Black Clip Threshold
-            # Remaps the alpha so that anything below `threshold` becomes 0 (fully transparent), 
-            # and scales the rest perfectly to 255. This deletes noise while keeping soft transitions!
             safe_range = max(1.0, 255.0 - threshold)
             alpha = np.clip((base_alpha - threshold), 0, 255) * (255.0 / safe_range)
             
             # 3. Un-premultiply RGB using the ORIGINAL base_alpha to avoid color shifting
-            # Avoid divide-by-zero on pure black pixels by clamping divisor
-            alpha_safe = np.where(base_alpha == 0, 1.0, base_alpha)
+            # CRITICAL FIX: To prevent low-luminance noise (like 10,0,0) from exploding
+            # into bright neon red (255,0,0) when divided by 10, we clamp the divisor.
+            # This makes dark noise fade to grey instead of saturated laser speckles!
+            alpha_safe = np.maximum(base_alpha, max(50.0, threshold))
             
-            # Un-premultiply the RGB channels to restore original vividness
-            # when rendered with the new soft alpha mask.
+            # Un-premultiply the RGB channels to restore original vividness safely
             rgb = (rgb / alpha_safe[:, :, None]) * 255.0
             
             # Reassemble into RGBA array
-            arr[:, :, :3] = rgb.clip(0, 255)
+            arr[:, :, :3] = np.where(alpha[:, :, None] <= 0, 0, rgb.clip(0, 255))
             arr[:, :, 3] = alpha.clip(0, 255)
             
             img = Image.fromarray(arr.astype(np.uint8))
