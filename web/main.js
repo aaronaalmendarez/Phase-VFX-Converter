@@ -267,20 +267,36 @@ function drawGrid(w, h) {
     const cw = w / cols;
     const ch = h / rows;
 
+    // Helper to trace all grid lines into the current path
+    function tracePaths() {
+        for (let c = 1; c < cols; c++) {
+            ctx.moveTo(c * cw, 0);
+            ctx.lineTo(c * cw, h);
+        }
+        for (let r = 1; r < rows; r++) {
+            ctx.moveTo(0, r * ch);
+            ctx.lineTo(w, r * ch);
+        }
+    }
+
     ctx.save();
-    ctx.strokeStyle = 'rgba(124, 58, 237, 0.35)';
+
+    // Pass 1: Dark outline (solid, wider) — guarantees visibility on light/transparent areas
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+    ctx.lineWidth = 3;
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    tracePaths();
+    ctx.stroke();
+
+    // Pass 2: Bright dashed core — guarantees visibility on dark areas
+    ctx.strokeStyle = 'rgba(168, 85, 247, 0.85)';
     ctx.lineWidth = 1;
     ctx.setLineDash([6, 4]);
     ctx.beginPath();
-    for (let c = 1; c < cols; c++) {
-        ctx.moveTo(c * cw, 0);
-        ctx.lineTo(c * cw, h);
-    }
-    for (let r = 1; r < rows; r++) {
-        ctx.moveTo(0, r * ch);
-        ctx.lineTo(w, r * ch);
-    }
+    tracePaths();
     ctx.stroke();
+
     ctx.restore();
 }
 
