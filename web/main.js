@@ -399,6 +399,7 @@ const maskEditor = {
     active: false,          // Is the modal in mask-edit mode?
     shape: 'ellipse',       // 'ellipse' | 'rect'
     mode: 'out',            // 'out' = erase inside, 'in' = keep inside only
+    toolMode: 'draw',       // 'draw' = click empty area creates new shape, 'select' = only move/resize
     feather: 8,
     currentFrame: 0,        // Which frame we're viewing/editing in the modal
     keyframes: {},          // { [frameIndex]: { x, y, w, h } } in normalized 0-1 coords
@@ -407,37 +408,39 @@ const maskEditor = {
     drawingNew: false,
     resizeHandle: null,     // 'nw','ne','sw','se'
     dragStart: { x: 0, y: 0, ox: 0, oy: 0, ow: 0, oh: 0 },
-    // Current shape being drawn/displayed (normalized 0-1 coords)
-    // hasShape = true once user has drawn at least one shape this session
     hasShape: false,
     current: { x: 0.25, y: 0.25, w: 0.5, h: 0.5 },
 };
 
 // ---- Tool Button Wiring ----
-$('mask-tool-ellipse').onclick = () => {
-    maskEditor.shape = 'ellipse';
-    $('mask-tool-ellipse').classList.add('active');
-    $('mask-tool-rect').classList.remove('active');
+function _setShape(s) {
+    maskEditor.shape = s;
+    $('mask-tool-ellipse').classList.toggle('active', s === 'ellipse');
+    $('mask-tool-rect').classList.toggle('active', s === 'rect');
     _renderMaskOverlay();
-};
-$('mask-tool-rect').onclick = () => {
-    maskEditor.shape = 'rect';
-    $('mask-tool-rect').classList.add('active');
-    $('mask-tool-ellipse').classList.remove('active');
+}
+function _setMode(m) {
+    maskEditor.mode = m;
+    $('mask-mode-out').classList.toggle('active', m === 'out');
+    $('mask-mode-in').classList.toggle('active', m === 'in');
     _renderMaskOverlay();
-};
-$('mask-mode-out').onclick = () => {
-    maskEditor.mode = 'out';
-    $('mask-mode-out').classList.add('active');
-    $('mask-mode-in').classList.remove('active');
-    _renderMaskOverlay();
-};
-$('mask-mode-in').onclick = () => {
-    maskEditor.mode = 'in';
-    $('mask-mode-in').classList.add('active');
-    $('mask-mode-out').classList.remove('active');
-    _renderMaskOverlay();
-};
+}
+function _setToolMode(t) {
+    maskEditor.toolMode = t;
+    $('mask-tool-draw').classList.toggle('active', t === 'draw');
+    $('mask-tool-select').classList.toggle('active', t === 'select');
+    // Update cursor on overlay
+    const overlay = $('mask-overlay-canvas');
+    if (overlay) overlay.style.cursor = t === 'draw' ? 'crosshair' : 'default';
+}
+
+$('mask-tool-ellipse').onclick = () => _setShape('ellipse');
+$('mask-tool-rect').onclick    = () => _setShape('rect');
+$('mask-mode-out').onclick     = () => _setMode('out');
+$('mask-mode-in').onclick      = () => _setMode('in');
+$('mask-tool-draw').onclick    = () => _setToolMode('draw');
+$('mask-tool-select').onclick  = () => _setToolMode('select');
+
 $('mask-feather-kf').oninput = function() {
     maskEditor.feather = parseInt(this.value);
     $('val-mask-feather-kf').textContent = this.value;
@@ -618,7 +621,7 @@ function _renderMaskOverlay() {
     }
 }
 
-// ---- Timeline UI ----
+// ---- Timeline UI & Drag-Scrub ----
 function _buildTimeline() {
     const track = $('mask-timeline-track');
     if (!track) return;
@@ -629,10 +632,37 @@ function _buildTimeline() {
         cell.className = 'mask-tl-cell';
         cell.dataset.frame = i;
         cell.style.flex = `1 0 ${Math.max(4, Math.min(12, 600 / total))}px`;
-        cell.onclick = () => _maskGoToFrame(i);
         track.appendChild(cell);
     }
     _updateTimelineUI();
+
+    // ---- Drag-scrub: hold and drag across cells to scrub frames ----
+    let tlScrubbing = false;
+
+    function _getFrameFromEvent(e) {
+        const el = document.elementFromPoint(e.clientX, e.clientY);
+        if (el && el.classList.contains('mask-tl-cell')) {
+            return parseInt(el.dataset.frame);
+        }
+        return null;
+    }
+
+    track.addEventListener('mousedown', (e) => {
+        tlScrubbing = true;
+        const f = _getFrameFromEvent(e);
+        if (f !== null) _maskGoToFrame(f);
+        e.preventDefault(); // prevent text selection during scrub
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (!tlScrubbing) return;
+        const f = _getFrameFromEvent(e);
+        if (f !== null && f !== maskEditor.currentFrame) _maskGoToFrame(f);
+    });
+
+    document.addEventListener('mouseup', () => {
+        tlScrubbing = false;
+    });
 }
 
 function _updateTimelineUI() {
@@ -698,19 +728,21 @@ document.addEventListener('mousedown', (e) => {
         maskEditor.resizing = true;
         maskEditor.resizeHandle = handle;
         maskEditor.dragStart = { x: pos.x, y: pos.y, ox: maskEditor.current.x, oy: maskEditor.current.y, ow: maskEditor.current.w, oh: maskEditor.current.h };
-    } else if (_hitTestBody(pos.x, pos.y)) {
+    } else if (maskEditor.hasShape && _hitTestBody(pos.x, pos.y)) {
+        // Move the existing shape
         maskEditor.dragging = true;
         maskEditor.dragStart = { x: pos.x, y: pos.y, ox: maskEditor.current.x, oy: maskEditor.current.y, ow: maskEditor.current.w, oh: maskEditor.current.h };
-    } else {
-        // Click outside = start drawing a new shape freely
+    } else if (maskEditor.toolMode === 'draw') {
+        // Only create a new shape in Draw mode
         maskEditor.drawingNew = true;
-        maskEditor.hasShape = true;  // mark that a shape now exists
+        maskEditor.hasShape = true;
         maskEditor.current.x = pos.x;
         maskEditor.current.y = pos.y;
         maskEditor.current.w = 0;
         maskEditor.current.h = 0;
         maskEditor.dragStart = { x: pos.x, y: pos.y };
     }
+    // In Select mode with a miss: do nothing (no accidental new shapes)
     _renderMaskOverlay();
 });
 

@@ -1051,23 +1051,22 @@ canvas#preview-canvas {
    ENLARGED ANIMATION MODAL — MASK EDITOR
    ============================================ */
 .anim-modal {
-    position: absolute;
+    position: fixed;
     inset: 0;
     z-index: 2000;
     display: flex;
     align-items: center;
     justify-content: center;
-    backdrop-filter: blur(8px);
 }
 .anim-modal.hidden {
     display: none !important;
 }
 .anim-modal-bg {
-    position: absolute;
+    position: fixed;
     inset: 0;
-    background: rgba(8, 8, 12, 0.85);
+    background: rgba(8, 8, 12, 0.96);
     cursor: zoom-out;
-    animation: fadeIn 0.25s ease-out;
+    animation: fadeIn 0.2s ease-out;
 }
 
 /* ---- Mask Editor Layout (flex row: toolbar | canvas+timeline) ---- */
