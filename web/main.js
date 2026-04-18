@@ -446,6 +446,40 @@ $('mask-feather-kf').oninput = function() {
     $('val-mask-feather-kf').textContent = this.value;
 };
 
+// ---- Playback & Frame Navigation Controls ----
+let maskPlayInterval = null;
+
+function _maskTogglePlay() {
+    const playBtn = $('mask-tl-play');
+    if (maskPlayInterval) {
+        clearInterval(maskPlayInterval);
+        maskPlayInterval = null;
+        if (playBtn) playBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
+    } else {
+        const fps = parseInt($('anim-fps').value) || 30;
+        maskPlayInterval = setInterval(() => {
+            let next = maskEditor.currentFrame + 1;
+            if (next >= _maskTotalFrames()) next = 0;
+            _maskGoToFrame(next);
+        }, 1000 / Math.max(1, fps));
+        if (playBtn) playBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>';
+    }
+}
+
+$('mask-tl-play').onclick = _maskTogglePlay;
+
+$('mask-tl-prev').onclick = () => {
+    let prev = maskEditor.currentFrame - 1;
+    if (prev < 0) prev = _maskTotalFrames() - 1;
+    _maskGoToFrame(prev);
+};
+
+$('mask-tl-next').onclick = () => {
+    let next = maskEditor.currentFrame + 1;
+    if (next >= _maskTotalFrames()) next = 0;
+    _maskGoToFrame(next);
+};
+
 // ---- Timeline Navigation ----
 function _maskTotalFrames() {
     return _getFrameGeometry().total;
@@ -469,8 +503,6 @@ function _maskGoToFrame(idx) {
     _updateTimelineUI();
 }
 
-$('mask-tl-prev').onclick = () => _maskGoToFrame(maskEditor.currentFrame - 1);
-$('mask-tl-next').onclick = () => _maskGoToFrame(maskEditor.currentFrame + 1);
 
 // ---- Keyframe Management ----
 $('btn-add-keyframe').onclick = () => {
@@ -636,8 +668,9 @@ function _buildTimeline() {
     }
     _updateTimelineUI();
 
-    // ---- Drag-scrub: hold and drag across cells to scrub frames ----
+    // ---- Drag-scrub & Keyframe Moving ----
     let tlScrubbing = false;
+    let draggingKeyframe = null; // { fromFrame: int, data: object }
 
     function _getFrameFromEvent(e) {
         const el = document.elementFromPoint(e.clientX, e.clientY);
@@ -648,20 +681,44 @@ function _buildTimeline() {
     }
 
     track.addEventListener('mousedown', (e) => {
-        tlScrubbing = true;
         const f = _getFrameFromEvent(e);
-        if (f !== null) _maskGoToFrame(f);
+        if (f !== null) {
+            if (maskEditor.keyframes[f] !== undefined) {
+                // User clicked ON a keyframe, prepare to drag it
+                draggingKeyframe = { fromFrame: f, data: maskEditor.keyframes[f] };
+            } else {
+                tlScrubbing = true;
+            }
+            _maskGoToFrame(f);
+        }
         e.preventDefault(); // prevent text selection during scrub
     });
 
     document.addEventListener('mousemove', (e) => {
-        if (!tlScrubbing) return;
         const f = _getFrameFromEvent(e);
-        if (f !== null && f !== maskEditor.currentFrame) _maskGoToFrame(f);
+        if (f !== null) {
+            if (draggingKeyframe) {
+                if (f !== draggingKeyframe.fromFrame) {
+                    // Move the keyframe to the new cell
+                    delete maskEditor.keyframes[draggingKeyframe.fromFrame];
+                    maskEditor.keyframes[f] = draggingKeyframe.data;
+                    draggingKeyframe.fromFrame = f; // Update source so we can keep dragging
+                    _maskGoToFrame(f);
+                }
+            } else if (tlScrubbing) {
+                if (f !== maskEditor.currentFrame) {
+                    _maskGoToFrame(f);
+                }
+            }
+        }
     });
 
     document.addEventListener('mouseup', () => {
         tlScrubbing = false;
+        if (draggingKeyframe) {
+            _updateTimelineUI(); // Ensure UI reflects final pos
+            draggingKeyframe = null;
+        }
     });
 }
 
