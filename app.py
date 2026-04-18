@@ -601,6 +601,7 @@ def run_birefnet_onnx(img, mask_params=None):
     thresh_val = mask_params.get("threshold", 128)
     edge_strength = mask_params.get("edge_strength", 1)
     feather = mask_params.get("feather", 0)
+    defringe = mask_params.get("defringe", 5)
     is_pixel_art = mask_params.get("pixel_art", False)
 
     # ── Preprocess: aspect-ratio-preserving resize with padding ──
@@ -684,6 +685,39 @@ def run_birefnet_onnx(img, mask_params=None):
         result.putalpha(Image.fromarray(combined, mode="L"))
     else:
         result.putalpha(mask_img)
+
+    # ── Color Decontamination (Defringe) ──
+    # Edge pixels with partial alpha still contain background color blended into RGB.
+    # We replace those fringe pixels' RGB with colors bled inward from fully-opaque interior.
+    if defringe > 0 and not is_pixel_art:
+        result_arr = np.array(result).astype(np.float32)
+        final_alpha = result_arr[:, :, 3]
+        rgb_out = result_arr[:, :, :3].copy()
+
+        # Build an "interior" mask: only pixels with alpha >= 240 are trusted color sources
+        interior = (final_alpha >= 240).astype(np.float32)
+        # Start with interior colors only; fringe pixels get zeroed
+        clean_rgb = rgb_out * interior[:, :, None]
+        weight = interior.copy()
+
+        # Iteratively diffuse interior color outward into fringe pixels
+        iterations = min(defringe * 3, 30)  # defringe 1..10 → 3..30 iterations
+        k = np.ones((3, 3), dtype=np.float32)
+        for _ in range(iterations):
+            sum_rgb = cv2.filter2D(clean_rgb, -1, k)
+            sum_w = cv2.filter2D(weight, -1, k)
+            # Where weight > 0, update the color (average of contributing neighbors)
+            mask_fill = (sum_w > 0) & (weight < 1)
+            for c in range(3):
+                clean_rgb[:, :, c] = np.where(mask_fill, sum_rgb[:, :, c] / np.maximum(sum_w, 1e-6), clean_rgb[:, :, c])
+            weight = np.where(sum_w > 0, 1.0, weight)
+
+        # Only replace RGB where alpha is partial (the fringe zone)
+        fringe_mask = (final_alpha > 0) & (final_alpha < 240)
+        for c in range(3):
+            result_arr[:, :, c] = np.where(fringe_mask, clean_rgb[:, :, c], result_arr[:, :, c])
+
+        result = Image.fromarray(result_arr.clip(0, 255).astype(np.uint8))
 
     return result
 

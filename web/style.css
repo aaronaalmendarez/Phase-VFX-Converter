@@ -1335,8 +1335,8 @@ canvas#preview-canvas {
 
 .modal-close-btn {
     position: absolute;
-    top: -12px;
-    right: -12px;
+    top: 16px;
+    right: 16px;
     width: 28px;
     height: 28px;
     border-radius: 50%;

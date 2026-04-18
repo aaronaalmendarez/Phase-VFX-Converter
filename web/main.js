@@ -1153,12 +1153,14 @@ document.querySelectorAll('.preset-chip').forEach(chip => {
 $('mask-threshold').oninput = function() { $('val-mask-thresh').textContent = this.value; };
 $('edge-refine').oninput = function() { $('val-edge-refine').textContent = this.value; };
 $('feather-radius').oninput = function() { $('val-feather').textContent = this.value; };
+$('defringe-strength').oninput = function() { $('val-defringe').textContent = this.value; };
 
 function _getMaskParams() {
     return {
         threshold: parseInt($('mask-threshold').value) || 128,
         edge_strength: parseInt($('edge-refine').value) || 1,
         feather: parseInt($('feather-radius').value) || 0,
+        defringe: parseInt($('defringe-strength').value),
         pixel_art: $('mask-pixel-art').checked
     };
 }
@@ -1168,6 +1170,7 @@ $('btn-reset-mask').onclick = () => {
     $('mask-threshold').value = 128; $('val-mask-thresh').textContent = '128';
     $('edge-refine').value = 1; $('val-edge-refine').textContent = '1';
     $('feather-radius').value = 0; $('val-feather').textContent = '0';
+    $('defringe-strength').value = 5; $('val-defringe').textContent = '5';
     $('mask-pixel-art').checked = false;
 };
 

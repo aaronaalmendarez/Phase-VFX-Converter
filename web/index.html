@@ -113,6 +113,12 @@
                     </div>
                     <p class="subtitle" style="margin-top: -4px; margin-bottom: 12px; font-size: 10px;">Softens mask edges. Good for glow/smoke effects.</p>
 
+                    <div class="slider-group">
+                        <label>Defringe <span class="val-badge" id="val-defringe">5</span></label>
+                        <input type="range" id="defringe-strength" min="0" max="10" value="5" step="1">
+                    </div>
+                    <p class="subtitle" style="margin-top: -4px; margin-bottom: 12px; font-size: 10px;">Removes white/light edge halos by bleeding interior color outward. 0 = off.</p>
+
                     <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; margin-top: 16px; margin-bottom: 6px; color: #e2e8f0; font-weight: 500;">
                         <input type="checkbox" id="mask-pixel-art" style="width: 16px; height: 16px; accent-color: #8b5cf6; cursor: pointer; margin: 0;">
                         Pixel Art Mode (Hard Cutout)
