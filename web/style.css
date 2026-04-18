@@ -1200,7 +1200,14 @@ canvas#preview-canvas {
     overflow: hidden;
     background: repeating-conic-gradient(rgba(255,255,255,0.03) 0% 25%, transparent 0% 50%) 50% / 16px 16px;
 }
-.mask-canvas-area canvas {
+/* Stacking wrapper so overlay is always exactly pixel-aligned over the frame canvas */
+.canvas-stack {
+    position: relative;
+    display: inline-block;
+    line-height: 0;
+}
+.canvas-stack canvas {
+    display: block;
     image-rendering: pixelated;
     max-width: 100%;
     max-height: calc(74vh - 80px);
@@ -1208,6 +1215,10 @@ canvas#preview-canvas {
 }
 #mask-overlay-canvas {
     position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%   !important;
+    height: 100%  !important;
     pointer-events: auto;
     cursor: crosshair;
 }

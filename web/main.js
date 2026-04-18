@@ -404,9 +404,12 @@ const maskEditor = {
     keyframes: {},          // { [frameIndex]: { x, y, w, h } } in normalized 0-1 coords
     dragging: false,
     resizing: false,
+    drawingNew: false,
     resizeHandle: null,     // 'nw','ne','sw','se'
     dragStart: { x: 0, y: 0, ox: 0, oy: 0, ow: 0, oh: 0 },
     // Current shape being drawn/displayed (normalized 0-1 coords)
+    // hasShape = true once user has drawn at least one shape this session
+    hasShape: false,
     current: { x: 0.25, y: 0.25, w: 0.5, h: 0.5 },
 };
 
@@ -449,8 +452,13 @@ function _maskGoToFrame(idx) {
     const total = _maskTotalFrames();
     maskEditor.currentFrame = Math.max(0, Math.min(idx, total - 1));
 
-    // Load interpolated shape for this frame
-    maskEditor.current = _interpolateMask(maskEditor.currentFrame);
+    // Only update current shape from keyframes if user isn't mid-draw
+    if (!maskEditor.dragging && !maskEditor.resizing && !maskEditor.drawingNew) {
+        const keys = Object.keys(maskEditor.keyframes).map(Number);
+        if (keys.length > 0) {
+            maskEditor.current = _interpolateMask(maskEditor.currentFrame);
+        }
+    }
 
     // Render the frame on the modal canvas
     _renderMaskEditFrame();
@@ -476,6 +484,7 @@ $('btn-del-keyframe').onclick = () => {
 
 $('btn-clear-mask').onclick = () => {
     maskEditor.keyframes = {};
+    maskEditor.hasShape = false;
     maskEditor.current = { x: 0.25, y: 0.25, w: 0.5, h: 0.5 };
     _updateTimelineUI();
     _renderMaskOverlay();
@@ -530,31 +539,45 @@ function _renderMaskOverlay() {
     const overlay = $('mask-overlay-canvas');
     if (!mCanvas || !overlay) return;
 
-    // Sync overlay size and position to match the animated canvas
+    // Match the overlay's PIXEL dimensions to the canvas element's actual pixel dimensions
+    // so the drawn shapes are in the right place.
+    const displayW = mCanvas.offsetWidth;
+    const displayH = mCanvas.offsetHeight;
+
+    // Position overlay exactly on top via CSS — the canvas pixel buffer drives coordinate math
     overlay.width = mCanvas.width;
     overlay.height = mCanvas.height;
-    overlay.style.width = mCanvas.style.width || mCanvas.width + 'px';
-    overlay.style.height = mCanvas.style.height || mCanvas.height + 'px';
+    overlay.style.width  = displayW + 'px';
+    overlay.style.height = displayH + 'px';
 
     const octx = overlay.getContext('2d');
     const w = overlay.width;
     const h = overlay.height;
     octx.clearRect(0, 0, w, h);
 
-    if (Object.keys(maskEditor.keyframes).length === 0 && !maskEditor.dragging) return;
+    // Don't draw anything until the user has actually placed a shape
+    if (!maskEditor.hasShape && !maskEditor.drawingNew) return;
+    // Also skip if the shape is degenerate (zero size)
+    if (maskEditor.current.w < 0.005 || maskEditor.current.h < 0.005) return;
 
     const m = maskEditor.current;
     const px = m.x * w, py = m.y * h, pw = m.w * w, ph = m.h * h;
 
+    // ---- Draw mask zone ----
     if (maskEditor.mode === 'out') {
-        // Draw the shape as a red semi-transparent zone indicating what will be erased
-        octx.fillStyle = 'rgba(255, 60, 60, 0.25)';
-        octx.strokeStyle = 'rgba(255, 60, 60, 0.8)';
+        octx.fillStyle = 'rgba(255, 60, 60, 0.22)';
+        octx.strokeStyle = 'rgba(255, 80, 80, 0.9)';
+        if (maskEditor.shape === 'ellipse') {
+            octx.beginPath();
+            octx.ellipse(px + pw / 2, py + ph / 2, pw / 2, ph / 2, 0, 0, Math.PI * 2);
+            octx.fill();
+        } else {
+            octx.fillRect(px, py, pw, ph);
+        }
     } else {
-        // Draw the OUTSIDE as darkened (everything NOT inside will be erased)
+        // Dim everything outside the mask shape
         octx.fillStyle = 'rgba(0, 0, 0, 0.55)';
         octx.fillRect(0, 0, w, h);
-        // Cut out the mask shape to show what's kept
         octx.globalCompositeOperation = 'destination-out';
         octx.fillStyle = 'rgba(0,0,0,1)';
         if (maskEditor.shape === 'ellipse') {
@@ -565,48 +588,33 @@ function _renderMaskOverlay() {
             octx.fillRect(px, py, pw, ph);
         }
         octx.globalCompositeOperation = 'source-over';
-        // Draw border for the kept region
-        octx.strokeStyle = 'rgba(52, 211, 153, 0.8)';
+        octx.strokeStyle = 'rgba(52, 211, 153, 0.9)';
     }
 
-    octx.lineWidth = 2;
-    octx.setLineDash([6, 4]);
-
-    if (maskEditor.mode === 'out') {
-        if (maskEditor.shape === 'ellipse') {
-            octx.beginPath();
-            octx.ellipse(px + pw / 2, py + ph / 2, pw / 2, ph / 2, 0, 0, Math.PI * 2);
-            octx.fill();
-            octx.stroke();
-        } else {
-            octx.fillRect(px, py, pw, ph);
-            octx.strokeRect(px, py, pw, ph);
-        }
+    // ---- Draw border ----
+    octx.lineWidth = 1.5;
+    octx.setLineDash([5, 4]);
+    if (maskEditor.shape === 'ellipse') {
+        octx.beginPath();
+        octx.ellipse(px + pw / 2, py + ph / 2, pw / 2, ph / 2, 0, 0, Math.PI * 2);
+        octx.stroke();
     } else {
-        // Just stroke the outline for mask-in
-        if (maskEditor.shape === 'ellipse') {
-            octx.beginPath();
-            octx.ellipse(px + pw / 2, py + ph / 2, pw / 2, ph / 2, 0, 0, Math.PI * 2);
-            octx.stroke();
-        } else {
-            octx.strokeRect(px, py, pw, ph);
-        }
+        octx.strokeRect(px, py, pw, ph);
     }
-
     octx.setLineDash([]);
 
-    // Draw 4 resize handles (corners)
-    const handleSize = 7;
-    octx.fillStyle = '#fff';
-    octx.strokeStyle = 'rgba(0,0,0,0.6)';
-    octx.lineWidth = 1;
-    const corners = [
+    // ---- Draw 4 corner resize handles ----
+    const hs = 8;
+    octx.lineWidth = 1.5;
+    octx.strokeStyle = '#fff';
+    const handleCorners = [
         [px, py], [px + pw, py],
         [px, py + ph], [px + pw, py + ph]
     ];
-    for (const [cx, cy] of corners) {
-        octx.fillRect(cx - handleSize / 2, cy - handleSize / 2, handleSize, handleSize);
-        octx.strokeRect(cx - handleSize / 2, cy - handleSize / 2, handleSize, handleSize);
+    for (const [cx, cy] of handleCorners) {
+        octx.fillStyle = 'rgba(20,20,20,0.7)';
+        octx.fillRect(cx - hs / 2, cy - hs / 2, hs, hs);
+        octx.strokeRect(cx - hs / 2, cy - hs / 2, hs, hs);
     }
 }
 
@@ -641,11 +649,14 @@ function _updateTimelineUI() {
 // ---- Mouse Interaction on Overlay Canvas ----
 const _overlayEl = () => $('mask-overlay-canvas');
 
+// Returns mouse position normalized to 0..1 relative to the DISPLAYED size of the overlay
 function _getOverlayMousePos(e) {
-    const rect = _overlayEl().getBoundingClientRect();
+    const ovEl = _overlayEl();
+    const rect = ovEl.getBoundingClientRect();
     return {
-        x: (e.clientX - rect.left) / rect.width,
-        y: (e.clientY - rect.top) / rect.height
+        // Clamp to [0,1] so dragging outside the canvas doesn't blow up coordinates
+        x: Math.max(0, Math.min(1, (e.clientX - rect.left)  / rect.width)),
+        y: Math.max(0, Math.min(1, (e.clientY - rect.top)   / rect.height))
     };
 }
 
@@ -693,13 +704,14 @@ document.addEventListener('mousedown', (e) => {
     } else {
         // Click outside = start drawing a new shape freely
         maskEditor.drawingNew = true;
+        maskEditor.hasShape = true;  // mark that a shape now exists
         maskEditor.current.x = pos.x;
         maskEditor.current.y = pos.y;
         maskEditor.current.w = 0;
         maskEditor.current.h = 0;
         maskEditor.dragStart = { x: pos.x, y: pos.y };
     }
-    _renderMaskOverlay(); // instantly render so user sees it right away
+    _renderMaskOverlay();
 });
 
 document.addEventListener('mousemove', (e) => {

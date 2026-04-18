@@ -311,8 +311,10 @@
                     <!-- Canvas Area -->
                     <div class="mask-canvas-wrapper">
                         <div class="mask-canvas-area" id="mask-canvas-area">
-                            <canvas id="anim-modal-canvas"></canvas>
-                            <canvas id="mask-overlay-canvas"></canvas>
+                            <div class="canvas-stack">
+                                <canvas id="anim-modal-canvas"></canvas>
+                                <canvas id="mask-overlay-canvas"></canvas>
+                            </div>
                         </div>
 
                         <!-- Keyframe Timeline -->
