@@ -621,13 +621,26 @@ def remove_background(image_base64, method="dark", threshold=30, mask_params=Non
             img = rembg_remove(img, session=session)
         elif method == "birefnet":
             img = run_birefnet_onnx(img, mask_params=mask_params)
-        else: # "dark"
-            arr = np.array(img)
-            # Calculate luminance: 0.299*R + 0.587*G + 0.114*B
-            lum = 0.299 * arr[:,:,0] + 0.587 * arr[:,:,1] + 0.114 * arr[:,:,2]
-            # Zero out alpha where luminance is below threshold
-            arr[:,:,3] = np.where(lum < threshold, 0, arr[:,:,3])
-            img = Image.fromarray(arr)
+        else: # "dark" -> Unmultiply Black (Luma Key)
+            # Perfect mathematical extraction for glowing/additive VFX on black
+            arr = np.array(img).astype(np.float32)
+            rgb = arr[:, :, :3]
+            
+            # Alpha is determined by the brightest color channel
+            alpha = np.max(rgb, axis=2)
+            
+            # Avoid divide-by-zero on pure black pixels by clamping divisor
+            alpha_safe = np.where(alpha == 0, 1.0, alpha)
+            
+            # Un-premultiply the RGB channels to restore original vividness
+            # when rendered with the new soft alpha mask.
+            rgb = (rgb / alpha_safe[:, :, None]) * 255.0
+            
+            # Reassemble into RGBA array
+            arr[:, :, :3] = rgb.clip(0, 255)
+            arr[:, :, 3] = alpha.clip(0, 255)
+            
+            img = Image.fromarray(arr.astype(np.uint8))
             
         eel.update_progress(1, 1, "Done.")
         buffered = io.BytesIO()
