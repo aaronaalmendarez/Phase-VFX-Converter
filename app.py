@@ -558,26 +558,33 @@ def _get_rembg_session(model_name="u2net"):
 
 
 def run_birefnet_onnx(img, mask_params=None):
-    from huggingface_hub import hf_hub_download
-    import huggingface_hub.file_download as fd
-    
-    # 1. Custom tqdm to pipe progress to frontend
-    class TqdmEelRedirect(fd.tqdm):
-        def __init__(self, *args, **kwargs):
-            super().__init__(*args, **kwargs)
-        def update(self, n=1):
-            super().update(n)
-            if self.total and self.total > 0:
-                mb_n = self.n / (1024*1024)
-                mb_tot = self.total / (1024*1024)
-                eel.update_progress(self.n, self.total, f"Downloading Model: {mb_n:.1f}MB / {mb_tot:.1f}MB")
-                
-    original_tqdm = fd.tqdm
-    fd.tqdm = TqdmEelRedirect
-    try:
-        model_path = hf_hub_download(repo_id="onnx-community/BiRefNet-ONNX", filename="onnx/model.onnx")
-    finally:
-        fd.tqdm = original_tqdm
+    def download_github_release(url, filename):
+        import os
+        import requests
+        cache_dir = os.path.join(os.path.expanduser('~'), '.cache', 'phase_vfx')
+        os.makedirs(cache_dir, exist_ok=True)
+        filepath = os.path.join(cache_dir, filename)
+        if os.path.exists(filepath):
+            return filepath
+            
+        r = requests.get(url, stream=True)
+        r.raise_for_status()
+        total = int(r.headers.get('content-length', 0))
+        downloaded = 0
+        with open(filepath + ".tmp", 'wb') as f:
+            for chunk in r.iter_content(chunk_size=8192*16):
+                if chunk:
+                    f.write(chunk)
+                    downloaded += len(chunk)
+                    if total:
+                        mb_d = downloaded / (1024*1024)
+                        mb_t = total / (1024*1024)
+                        eel.update_progress(downloaded, total, f"Downloading Matting Model: {mb_d:.1f}MB / {mb_t:.1f}MB")
+        os.rename(filepath + ".tmp", filepath)
+        return filepath
+        
+    url = "https://github.com/ZhengPeng7/BiRefNet/releases/download/v1/BiRefNet-matting-epoch_100.onnx"
+    model_path = download_github_release(url, "BiRefNet-matting-epoch_100.onnx")
         
     load_target = "GPU memory" if EXECUTION_MODE == "gpu" else "CPU"
     eel.update_progress(1, 1, f"Loading ML Model into {load_target}...")

@@ -1207,8 +1207,8 @@ $('btn-bg-ai').onclick = async () => {
 
 $('btn-bg-biref').onclick = async () => {
     if (!currentImageB64) return;
-    log("Running Pro AI Segmentation (BiRefNet)... First run downloads the model (~350 MB).");
-    globalProgressShow("Pro AI Segmentation in progress...", 5);
+    log("Running Pro AI Matting Segmentation (BiRefNet)... First run downloads the model (~927 MB).");
+    globalProgressShow("Pro AI Matting in progress...", 5);
     let fakePct = 5;
     const ticker = setInterval(() => {
         fakePct = Math.min(fakePct + 1, 95);
