@@ -155,6 +155,7 @@ async function initSettings() {
             if (radio) radio.checked = true;
         }
         if (s.frame_name_prefix) $('frame-name-prefix').value = s.frame_name_prefix;
+        if (s.mask_pixel_art !== undefined) $('mask-pixel-art').checked = s.mask_pixel_art;
     } catch (e) {
         console.warn('Failed to load settings:', e);
     }
@@ -168,7 +169,8 @@ function saveSettingsDebounced() {
             api_key: $('api-key').value,
             target_id: $('target-id').value,
             creator_type: creatorRadio ? creatorRadio.value : 'User',
-            frame_name_prefix: $('frame-name-prefix').value
+            frame_name_prefix: $('frame-name-prefix').value,
+            mask_pixel_art: $('mask-pixel-art').checked
         })();
     }, 500);
 }
@@ -177,6 +179,7 @@ function saveSettingsDebounced() {
 $('api-key').addEventListener('input', saveSettingsDebounced);
 $('target-id').addEventListener('input', saveSettingsDebounced);
 $('frame-name-prefix').addEventListener('input', saveSettingsDebounced);
+$('mask-pixel-art').addEventListener('change', saveSettingsDebounced);
 document.querySelectorAll('input[name="creator_type"]').forEach(r => {
     r.addEventListener('change', saveSettingsDebounced);
 });
@@ -584,7 +587,8 @@ function _getMaskParams() {
     return {
         threshold: parseInt($('mask-threshold').value) || 128,
         edge_strength: parseInt($('edge-refine').value) || 1,
-        feather: parseInt($('feather-radius').value) || 0
+        feather: parseInt($('feather-radius').value) || 0,
+        pixel_art: $('mask-pixel-art').checked
     };
 }
 

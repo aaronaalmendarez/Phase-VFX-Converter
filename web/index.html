@@ -108,7 +108,14 @@
                         <label>Feather Radius <span class="val-badge" id="val-feather">0</span></label>
                         <input type="range" id="feather-radius" min="0" max="10" value="0" step="1">
                     </div>
-                    <p class="subtitle" style="margin-top: -4px; font-size: 10px;">Softens mask edges. Good for glow/smoke effects.</p>
+                    <p class="subtitle" style="margin-top: -4px; margin-bottom: 12px; font-size: 10px;">Softens mask edges. Good for glow/smoke effects.</p>
+
+                    <label class="checkbox-container" style="margin-top: 12px; font-size: 13px;">
+                        <input type="checkbox" id="mask-pixel-art">
+                        <span class="checkmark"></span>
+                        Pixel Art Mode (Hard Cutout)
+                    </label>
+                    <p class="subtitle" style="margin-top: 4px; font-size: 10px;">Forces strict binary edges and NEAREST scaling to prevent blurry halos. Best for sprites.</p>
                 </div>
 
                 <h3 class="section-heading">Legacy Modes</h3>

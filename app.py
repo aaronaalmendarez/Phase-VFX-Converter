@@ -468,14 +468,24 @@ def run_birefnet_onnx(img, mask_params=None):
     if img.mode == "RGBA":
         orig_alpha = np.array(img.split()[3])
 
+    # ── Apply mask refinement parameters ──
+    if mask_params is None:
+        mask_params = {}
+    thresh_val = mask_params.get("threshold", 128)
+    edge_strength = mask_params.get("edge_strength", 1)
+    feather = mask_params.get("feather", 0)
+    is_pixel_art = mask_params.get("pixel_art", False)
+
     # ── Preprocess: aspect-ratio-preserving resize with padding ──
     # Stretching non-square sprites to 1024x1024 distorts them and hurts segmentation.
     # Instead, we fit the image inside the square and pad with black.
     rgb_img = img.convert("RGB")
     scale = min(MODEL_RES / orig_w, MODEL_RES / orig_h)
     new_w, new_h = int(orig_w * scale), int(orig_h * scale)
-    # LANCZOS preserves sharp pixel-art edges better than BILINEAR
-    resized = rgb_img.resize((new_w, new_h), Image.Resampling.LANCZOS)
+    
+    # NEAREST protects pixel art edges from blurring. LANCZOS is better for natural photos/VFX.
+    resize_mode = Image.Resampling.NEAREST if is_pixel_art else Image.Resampling.LANCZOS
+    resized = rgb_img.resize((new_w, new_h), resize_mode)
 
     # Pad to MODEL_RES x MODEL_RES (center the image on a black canvas)
     pad_left = (MODEL_RES - new_w) // 2
@@ -504,23 +514,16 @@ def run_birefnet_onnx(img, mask_params=None):
     # Crop the padded region back to the actual image area
     pred = pred[pad_top:pad_top + new_h, pad_left:pad_left + new_w]
 
-    # ── Apply mask refinement parameters ──
-    if mask_params is None:
-        mask_params = {}
-    thresh_val = mask_params.get("threshold", 128)
-    edge_strength = mask_params.get("edge_strength", 1)
-    feather = mask_params.get("feather", 0)
-
-    # Convert sigmoid [0,1] to uint8, then apply threshold
-    # Lower threshold = keep more soft detail (smoke, glow)
-    # thresh_val 0 = keep everything, 255 = keep only the strongest segments
     mask_u8 = (pred * 255.0).clip(0, 255).astype(np.uint8)
 
-    # Apply binary threshold: pixels below thresh_val/2 become 0,
-    # pixels above become proportional. This preserves soft edges
-    # while cutting weak background predictions.
-    cutoff = max(1, thresh_val // 2)
-    mask_u8 = np.where(mask_u8 < cutoff, 0, mask_u8).astype(np.uint8)
+    # ── Pixel Art vs Soft Thresholding ──
+    if is_pixel_art:
+        # Strictly binary mask: 0 or 255. No soft anti-aliased transitions that cause color bleed.
+        mask_u8 = np.where(mask_u8 < thresh_val, 0, 255).astype(np.uint8)
+    else:
+        # Proportional mask: keeps soft edges. Pixels below half-threshold become 0.
+        cutoff = max(1, thresh_val // 2)
+        mask_u8 = np.where(mask_u8 < cutoff, 0, mask_u8).astype(np.uint8)
 
     # ── Morphological cleanup (controlled by edge_strength) ──
     if edge_strength > 0:
@@ -535,13 +538,13 @@ def run_birefnet_onnx(img, mask_params=None):
         mask_u8 = cv2.morphologyEx(mask_u8, cv2.MORPH_OPEN, kernel_open, iterations=1)
 
     # ── Feather (Gaussian blur on mask edges) ──
-    if feather > 0:
+    if feather > 0 and not is_pixel_art:
         blur_size = feather * 2 + 1  # must be odd: 1,3,5,7,...,21
         mask_u8 = cv2.GaussianBlur(mask_u8, (blur_size, blur_size), 0)
 
-    # Resize mask back to original dimensions (LANCZOS for sharp edges)
+    # Resize mask back to original dimensions
     mask_img = Image.fromarray(mask_u8, mode="L")
-    mask_img = mask_img.resize((orig_w, orig_h), Image.Resampling.LANCZOS)
+    mask_img = mask_img.resize((orig_w, orig_h), resize_mode)
 
     # ── Compose final RGBA ──
     result = img.convert("RGBA")
