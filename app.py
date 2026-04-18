@@ -778,13 +778,18 @@ def fetch_and_slice(asset_id, cols, rows, target_id, is_group, api_key, name_pre
         return {"success": False, "error": str(e)}
 
 @eel.expose
-def slice_and_upload(image_base64, cols, rows, target_id, is_group, api_key, name_prefix="Phase_VFX_Frame"):
+def slice_and_upload(image_base64, cols, rows, target_id, is_group, api_key, name_prefix="Phase_VFX_Frame", mode="slice"):
     try:
         header, encoded = image_base64.split(",", 1)
         image_data = base64.b64decode(encoded)
         img = Image.open(io.BytesIO(image_data))
         
         width, height = img.size
+        
+        if mode == "sheet":
+            cols = 1
+            rows = 1
+            
         frame_width = width // cols
         frame_height = height // rows
         

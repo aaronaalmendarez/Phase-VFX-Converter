@@ -1241,11 +1241,20 @@ $('grid-cols').addEventListener('change', updateNamePreview);
 $('grid-rows').addEventListener('change', updateNamePreview);
 updateNamePreview();
 
-$('btn-upload').onclick = async () => {
+async function _handleUpload(mode) {
     if (!currentImageB64) return alert("Import an image first.");
     const apiKey   = $('api-key').value;
     const targetId = $('target-id').value;
     if (!apiKey || !targetId) return alert("Provide both API Key and Target ID.");
+
+    // Warning check if uploading full sheet > 8000
+    if (mode === 'sheet') {
+        const cv = $('preview-canvas');
+        if (cv.width > 8000 || cv.height > 8000) {
+            const proceed = confirm(`Warning: The spritesheet is ${cv.width}x${cv.height}.\n\nRoblox requires Decals to be under 8000x8000 and downscales anything over 1024x1024.\n\nProceed anyway?`);
+            if (!proceed) return;
+        }
+    }
 
     const isGroup = document.querySelector('input[name="creator_type"]:checked').value === "Group";
     const cols = parseInt($('grid-cols').value) || 1;
@@ -1254,19 +1263,24 @@ $('btn-upload').onclick = async () => {
 
     showProgress();
     $('results-area').classList.add('hidden');
-    log(`Slicing and uploading to Roblox as "${namePrefix}_1, ${namePrefix}_2, ..."...`);
+    log(mode === 'sheet' 
+        ? `Uploading full spritesheet to Roblox as "${namePrefix}"...` 
+        : `Slicing and uploading to Roblox as "${namePrefix}_1, ${namePrefix}_2, ..."...`);
 
-    const res = await eel.slice_and_upload(currentImageB64, cols, rows, targetId, isGroup, apiKey, namePrefix)();
+    const res = await eel.slice_and_upload(currentImageB64, cols, rows, targetId, isGroup, apiKey, namePrefix, mode)();
 
     if (res.success && res.ids) {
         uploadedAssetIds = res.ids;
         $('results-area').classList.remove('hidden');
-        log(`Upload complete — ${res.ids.length} frames uploaded.`);
+        log(`Upload complete — ${res.ids.length} uploaded.`);
     } else {
         logError(res.error);
     }
     hideProgress(1500);
-};
+}
+
+$('btn-upload-sheet').onclick = () => _handleUpload('sheet');
+$('btn-upload-slice').onclick = () => _handleUpload('slice');
 
 $('btn-fetch-remote').onclick = async () => {
     const assetId = $('remote-asset-id').value;
