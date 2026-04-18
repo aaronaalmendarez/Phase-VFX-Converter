@@ -645,7 +645,7 @@ $('btn-reset-mask').onclick = () => {
 };
 
 $('btn-reset-vfx').onclick = () => {
-    $('luma-threshold').value = 15; $('val-luma-thresh').textContent = '15';
+    $('luma-threshold').value = 35; $('val-luma-thresh').textContent = '35';
 };
 $('btn-bg-dark').onclick = async () => {
     if (!currentImageB64) return;
