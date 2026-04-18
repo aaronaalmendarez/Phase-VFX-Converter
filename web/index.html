@@ -3,309 +3,228 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Phase VFX Converter</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <title>Phase Flipbook Editor</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="icon" type="image/png" href="icons/phaselogo.png">
+    <script type="text/javascript" src="/eel.js"></script>
+    <script src="main.js" defer></script>
 </head>
 <body>
-    <!-- Global SVG Defs to prevent display:none bugs -->
-    <svg width="0" height="0" style="position: absolute;">
-        <defs>
-            <linearGradient id="iconGrad" x1="0" y1="0" x2="24" y2="24">
-                <stop offset="0%" stop-color="#DFCAFF"/>
-                <stop offset="100%" stop-color="#A48DD6"/>
-            </linearGradient>
-            <linearGradient id="spinGrad">
-                <stop offset="0%" stop-color="#DFCAFF"/>
-                <stop offset="100%" stop-color="#A48DD6"/>
-            </linearGradient>
-        </defs>
-    </svg>
-
-    <!-- ============ ONBOARDING OVERLAY ============ -->
-    <div id="onboarding" class="onboarding-overlay">
-        <div class="onboarding-backdrop"></div>
-        <div class="onboarding-card">
-            <div class="onboarding-glow"></div>
-
-            <!-- Step Indicators -->
-            <div class="step-dots">
-                <div class="dot active" data-step="0"></div>
-                <div class="dot" data-step="1"></div>
-                <div class="dot" data-step="2"></div>
-            </div>
-
-            <!-- Step 0: Welcome -->
-            <div class="step active" id="step0">
-                <div class="step-icon">
-                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="url(#iconGrad)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
-                    </svg>
-                </div>
-                <h2>Phase Flipbook Converter</h2>
-                <p>Turn any flipbook spritesheet into individual Roblox decals in seconds.</p>
-                <div class="welcome-features">
-                    <div class="feature-pill">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-                        Auto-slice any grid
-                    </div>
-                    <div class="feature-pill">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                        Upload directly to Roblox
-                    </div>
-                    <div class="feature-pill">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                        100% local &amp; private
-                    </div>
-                </div>
-                <button class="onboarding-btn" onclick="nextStep()">Get Started →</button>
-            </div>
-
-            <!-- Step 1: Get API Key -->
-            <div class="step" id="step1">
-                <div class="step-icon">
-                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="url(#iconGrad)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>
-                    </svg>
-                </div>
-                <h2>Quick Setup</h2>
-                <p>To upload frames to your Roblox account, you'll need an API key. It takes about 30 seconds.</p>
-
-                <a href="#" onclick="openExternal('https://create.roblox.com/dashboard/credentials')" class="open-link-btn">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-                    Open Roblox Creator Dashboard
-                </a>
-
-                <div class="instruction-steps">
-                    <div class="instruction">
-                        <span class="instruction-num">1</span>
-                        <div class="instruction-text">
-                            <strong>Create API Key</strong>
-                            <span class="instruction-sub">Click the blue "Create API Key" button</span>
-                        </div>
-                    </div>
-                    <div class="instruction">
-                        <span class="instruction-num">2</span>
-                        <div class="instruction-text">
-                            <strong>Name it anything</strong>
-                            <span class="instruction-sub">e.g. "Phase Converter" — this is just a label</span>
-                        </div>
-                    </div>
-                    <div class="instruction">
-                        <span class="instruction-num">3</span>
-                        <div class="instruction-text">
-                            <strong>Add Assets permission</strong>
-                            <span class="instruction-sub">Under "Access Permissions", select <em>Assets</em> → enable <em>Read</em> and <em>Write</em></span>
-                        </div>
-                    </div>
-                    <div class="instruction">
-                        <span class="instruction-num">4</span>
-                        <div class="instruction-text">
-                            <strong>Set Security (0.0.0.0/0)</strong>
-                            <span class="instruction-sub">Under "Security", add <em>0.0.0.0/0</em> as an accepted IP so it works from any computer</span>
-                        </div>
-                    </div>
-                    <div class="instruction">
-                        <span class="instruction-num">5</span>
-                        <div class="instruction-text">
-                            <strong>Copy the key</strong>
-                            <span class="instruction-sub">Click "Save & Generate Key", then copy it — you won't see it again!</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="btn-row">
-                    <button class="onboarding-btn secondary" onclick="prevStep()">Back</button>
-                    <button class="onboarding-btn" onclick="nextStep()">I have my key →</button>
-                </div>
-            </div>
-
-            <!-- Step 2: Paste Key -->
-            <div class="step" id="step2">
-                <div class="step-icon">
-                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="url(#iconGrad)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                    </svg>
-                </div>
-                <h2>Almost done!</h2>
-                <p>Paste the key you just copied. It never leaves your computer — it goes straight to Roblox.</p>
-                <div class="onboarding-input-wrap">
-                    <input type="password" id="onboardingKey" placeholder="Paste your API key here..." spellcheck="false" autocomplete="off">
-                    <button class="toggle-vis-btn" onclick="toggleKeyVis(this)" title="Show/Hide">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                    </button>
-                </div>
-                <div class="trust-note">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                    Your key is stored locally in memory only. It is never saved to disk or sent to any server other than Roblox.
-                </div>
-                <div class="btn-row">
-                    <button class="onboarding-btn secondary" onclick="prevStep()">Back</button>
-                    <button class="onboarding-btn" onclick="finishOnboarding()" id="finishBtn">Start Converting →</button>
-                </div>
-            </div>
+    <div id="app">
+        <!-- Global Progress Strip -->
+        <div class="global-progress hidden" id="global-progress">
+            <div class="global-progress-fill" id="global-progress-fill"></div>
+            <span class="global-progress-label" id="global-progress-label"></span>
         </div>
-    </div>
-
-    <!-- ============ MAIN APPLICATION ============ -->
-    <div class="app-container" id="mainApp">
         <!-- Sidebar -->
-        <aside class="settings-panel">
+        <aside class="sidebar">
             <div class="sidebar-header">
-                <div class="logo-mark">
-                    <img src="icons/icon.png" width="24" height="24" style="object-fit:contain;border-radius:4px;" alt="Phase logo">
+                <img class="logo-icon" src="icons/phaselogo.png" alt="Phase">
+                <h2>Phase Engine</h2>
+                <span class="version-tag">v2.0</span>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <button class="nav-btn active" data-tab="import">Import</button>
+                <button class="nav-btn" data-tab="bg">Remove BG</button>
+                <button class="nav-btn" data-tab="edit">Filters</button>
+                <button class="nav-btn" data-tab="upload">Upload</button>
+            </nav>
+
+            <!-- ======== TAB: IMPORT ======== -->
+            <div class="tab-content active" id="tab-import">
+                <h3 class="section-heading">Asset Source</h3>
+                <p class="subtitle">Load an image, video, or animated GIF to begin composing your spritesheet.</p>
+                <button id="btn-browse-image" class="action-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg> Browse Image</button>
+                <button id="btn-browse-video" class="action-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg> Browse Video / GIF</button>
+                
+                <div id="video-settings" class="setting-group" style="margin-top: 4px;">
+                    <label>Max Frames to Extract
+                        <input type="number" id="video-frames" value="64" min="1" max="256">
+                    </label>
                 </div>
-                <span class="logo-text">Phase Converter</span>
+                
+                <h3 class="section-heading">Spritesheet Grid</h3>
+                <div class="grid-inputs">
+                    <label>Columns
+                        <input type="number" id="grid-cols" value="8" min="1" max="64">
+                    </label>
+                    <label>Rows
+                        <input type="number" id="grid-rows" value="8" min="1" max="64">
+                    </label>
+                </div>
+
+                <div class="stat-bar" id="stat-bar" style="display: none;">
+                    <div class="stat-item">Size: <span class="stat-val" id="stat-size">-</span></div>
+                    <div class="stat-item">Frames: <span class="stat-val" id="stat-frames">-</span></div>
+                </div>
             </div>
 
-            <div class="sidebar-section">
-                <div class="section-label">Authentication</div>
-                <div class="input-group">
-                    <label>API Key</label>
-                    <div class="input-with-icon">
-                        <input type="password" id="apiKey" placeholder="roblox_key_..." spellcheck="false" autocomplete="off">
-                        <button class="input-icon-btn" onclick="toggleKeyVis(this)" title="Show/Hide">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            <!-- ======== TAB: BG REMOVAL ======== -->
+            <div class="tab-content" id="tab-bg">
+                <!-- GPU Hardware Info Card -->
+                <div class="gpu-info-card" id="gpu-info-card">
+                    <div class="gpu-info-header">
+                        <div class="gpu-info-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4" y="6" width="16" height="12" rx="2"/><path d="M8 6V4m4 2V4m4 2V4M8 18v2m4-2v2m4-2v2"/><circle cx="12" cy="12" r="2"/></svg>
+                        </div>
+                        <div class="gpu-info-text">
+                            <span class="gpu-info-name" id="gpu-info-name">Detecting GPU...</span>
+                            <span class="gpu-info-detail" id="gpu-info-detail"></span>
+                        </div>
+                    </div>
+                    <div class="gpu-mode-toggle">
+                        <button class="mode-btn active" id="mode-gpu" data-mode="gpu">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                            GPU
+                        </button>
+                        <button class="mode-btn" id="mode-cpu" data-mode="cpu">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6v6H9z"/></svg>
+                            CPU
                         </button>
                     </div>
                 </div>
+
+                <h3 class="section-heading">AI Background</h3>
+                <p class="subtitle" style="margin-bottom: 24px;">Automatically extract characters and fx with ML.</p>
+                <button id="btn-bg-biref" class="action-btn ai-btn large" style="margin-bottom: 8px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg> Pro AI (BiRefNet)</button>
+                <button id="btn-bg-ai" class="action-btn ai-btn large"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path></svg> AI Removal (Rembg)</button>
+                
+                <h3 class="section-heading">Legacy Modes</h3>
+                <p class="subtitle" style="margin-bottom: 12px;">Fast thresholding for purely black backgrounds.</p>
+                <button id="btn-bg-dark" class="action-btn outline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg> Remove Dark Pixels</button>
             </div>
 
-            <div class="sidebar-section">
-                <div class="section-label">Target</div>
-                <div class="input-group">
-                    <label>Creator Type</label>
-                    <div class="segmented-control">
-                        <input type="radio" name="creatorType" id="radioUser" value="user" checked>
-                        <label for="radioUser">User</label>
-                        <input type="radio" name="creatorType" id="radioGroup" value="group">
-                        <label for="radioGroup">Group</label>
-                        <span class="segmented-thumb"></span>
+            <!-- ======== TAB: ADJUSTMENTS ======== -->
+            <div class="tab-content" id="tab-edit">
+                <h3 class="section-heading">Presets</h3>
+                <div class="preset-row">
+                    <button class="preset-chip" data-preset="reset">Reset</button>
+                    <button class="preset-chip" data-preset="vivid">Vivid</button>
+                    <button class="preset-chip" data-preset="cinematic">Cinematic</button>
+                    <button class="preset-chip" data-preset="sharp">Sharpen</button>
+                    <button class="preset-chip" data-preset="muted">Muted</button>
+                </div>
+
+                <h3 class="section-heading">Manual Adjustments</h3>
+                <div class="slider-group">
+                    <label>Brightness <span class="val-badge" id="val-brightness">1.0</span></label>
+                    <input type="range" id="slider-brightness" min="0" max="2" step="0.05" value="1.0">
+                </div>
+                <div class="slider-group">
+                    <label>Contrast <span class="val-badge" id="val-contrast">1.0</span></label>
+                    <input type="range" id="slider-contrast" min="0" max="2" step="0.05" value="1.0">
+                </div>
+                <div class="slider-group">
+                    <label>Saturation <span class="val-badge" id="val-saturation">1.0</span></label>
+                    <input type="range" id="slider-saturation" min="0" max="3" step="0.05" value="1.0">
+                </div>
+                <div class="slider-group">
+                    <label>Sharpness <span class="val-badge" id="val-sharpness">1.0</span></label>
+                    <input type="range" id="slider-sharpness" min="0" max="3" step="0.05" value="1.0">
+                </div>
+                <button id="btn-apply-filters" class="action-btn primary" style="margin-top: 8px;">Apply Filters</button>
+                <div class="btn-group">
+                    <button id="btn-undo" class="action-btn outline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path></svg> Undo</button>
+                    <button id="btn-revert" class="action-btn outline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg> Revert Base</button>
+                </div>
+            </div>
+
+            <!-- ======== TAB: UPLOAD ======== -->
+            <div class="tab-content" id="tab-upload">
+                <h3 class="section-heading">Target Identity</h3>
+                <div class="toggle-group">
+                    <label><input type="radio" name="creator_type" value="User" checked> User</label>
+                    <label><input type="radio" name="creator_type" value="Group"> Group</label>
+                </div>
+                <label>Target ID
+                    <input type="text" id="target-id" placeholder="Your Roblox User or Group ID">
+                </label>
+
+                <h3 class="section-heading">Open Cloud API Key</h3>
+                <label>API Key
+                    <input type="password" id="api-key" placeholder="Paste your Open Cloud key">
+                </label>
+
+                <h3 class="section-heading">Remote Fetch (Optional)</h3>
+                <label>Roblox Asset ID
+                    <input type="text" id="remote-asset-id" placeholder="e.g. 123456789">
+                </label>
+                <button id="btn-fetch-remote" class="action-btn outline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg> Fetch Remote Asset</button>
+
+                <div style="height: 12px;"></div>
+                <button id="btn-upload" class="action-btn primary large"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg> Slice & Upload</button>
+                
+                <div class="progress-container hidden" id="progress-container">
+                    <span id="progress-text">Processing...</span>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progress-fill"></div>
                     </div>
                 </div>
-                <div class="input-group">
-                    <label>Creator ID</label>
-                    <input type="number" id="creatorId" placeholder="Enter User or Group ID">
+
+                <div id="results-area" class="hidden">
+                    <h3 class="section-heading" style="color: var(--success);">Upload Complete</h3>
+                    <button class="action-btn" id="btn-copy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg> Copy IDs</button>
                 </div>
             </div>
-
-            <div class="sidebar-section">
-                <div class="section-label">Grid</div>
-                <div class="input-group">
-                    <label>Spritesheet Layout</label>
-                    <div class="grid-inputs">
-                        <div class="grid-field">
-                            <span class="grid-label">Cols</span>
-                            <input type="number" id="gridCols" value="4" min="1" max="64">
-                        </div>
-                        <span class="grid-x">×</span>
-                        <div class="grid-field">
-                            <span class="grid-label">Rows</span>
-                            <input type="number" id="gridRows" value="4" min="1" max="64">
-                        </div>
-                        <div class="grid-total" id="gridTotal">= 16 frames</div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="sidebar-footer">
-                <button class="help-btn" onclick="showOnboarding()">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-                    Setup Guide
-                </button>
-            </div>
+            
+            <div id="global-log" class="log-overlay"></div>
         </aside>
 
-        <!-- Main Content -->
-        <main class="content-panel">
-            <!-- State: Drop Zone -->
-            <div id="stateIdle" class="state-view active">
-                <div id="dropzone" class="dropzone">
-                    <div class="dropzone-ring"></div>
-                    <div class="dropzone-content" id="dropContent">
-                        <div class="drop-icon">
-                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                                <polyline points="17 8 12 3 7 8"/>
-                                <line x1="12" y1="3" x2="12" y2="15"/>
-                            </svg>
-                        </div>
-                        <h2>Drop your spritesheet here</h2>
-                        <p>or click to browse · PNG / JPG</p>
-                    </div>
-                    <img id="imagePreview" class="image-preview" />
-                </div>
-                <button id="uploadBtn" class="upload-btn" onclick="startUpload()">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                    Slice & Upload
-                </button>
+        <!-- Main View -->
+        <main class="main-content">
+            <!-- Toast Notification Container -->
+            <div id="toast-container" class="toast-container"></div>
 
-                <div class="cloud-import-section" style="margin-top: 24px; text-align: center;">
-                    <div style="margin-bottom: 12px; color: #8F8F9D; font-size: 14px; display: flex; align-items: center; justify-content: center; gap: 8px;">
-                        <span style="flex: 1; height: 1px; background: rgba(255,255,255,0.1);"></span>
-                        <span>or slice an existing Roblox decal</span>
-                        <span style="flex: 1; height: 1px; background: rgba(255,255,255,0.1);"></span>
+            <div class="canvas-container" id="canvas-container">
+                <div id="canvas-viewport">
+                    <div id="canvas-transform-layer">
+                        <canvas id="preview-canvas"></canvas>
                     </div>
-                    <div style="display: flex; gap: 8px;">
-                        <input type="text" id="cloudAssetId" placeholder="Paste Asset ID (e.g. 123456789)" style="flex: 1; padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.2); color: white; font-family: inherit;">
-                        <button class="upload-btn" style="width: auto; padding: 0 16px; margin: 0; display: flex;" onclick="startCloudUpload()">
-                            Fetch & Slice
-                        </button>
+                </div>
+                <div class="placeholder-text" id="canvas-placeholder">
+
+                    <span class="drop-icon"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 4v16m8-8H4"></path></svg></span>
+                    <span>Import an image or video to begin</span>
+                </div>
+                <div class="drop-zone-overlay" id="drop-zone">
+                    <span>Drop file here</span>
+                </div>
+            </div>
+            
+            <div class="bottom-bar">
+                <div class="animation-preview">
+                    <div class="anim-box tooltip-trigger" id="btn-enlarge-anim" title="Click to fully enlarge">
+                        <canvas id="anim-canvas" width="48" height="48"></canvas>
+                        <div class="anim-box-overlay"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg></div>
                     </div>
+                    <div class="anim-controls">
+                        <button id="btn-play-pause"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M6 4h4v16H6zm8 0h4v16h-4z"></path></svg></button>
+                        <label>FPS
+                            <input type="number" id="anim-fps" value="30" min="1" max="120">
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="export-local">
+                    <div id="gpu-status-chip" class="gpu-chip gpu-chip-idle">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4" y="6" width="16" height="12" rx="2"/><path d="M8 6V4m4 2V4m4 2V4M8 18v2m4-2v2m4-2v2"/><circle cx="12" cy="12" r="2"/></svg>
+                        <span>Ready</span>
+                    </div>
+                    <button class="action-btn outline" id="btn-save-local"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg> Save PNG</button>
                 </div>
             </div>
 
-            <!-- State: Uploading -->
-            <div id="stateUploading" class="state-view">
-                <div class="upload-panel">
-                    <div class="upload-spinner">
-                        <svg viewBox="0 0 50 50" class="spinner-svg">
-                            <circle cx="25" cy="25" r="20" fill="none" stroke="url(#spinGrad)" stroke-width="3" stroke-linecap="round"/>
-                        </svg>
-                        <span class="spinner-percent" id="spinnerPercent">0%</span>
-                    </div>
-                    <h3 id="uploadStatusTitle">Slicing frames...</h3>
-                    <p class="upload-detail" id="uploadDetail">Preparing your spritesheet</p>
-                    <div class="progress-track">
-                        <div class="progress-fill" id="progressFill"></div>
-                    </div>
-                    <div class="frame-counter" id="frameCounter">0 / 0</div>
+            <!-- Enlarged Animation Modal Overlay -->
+            <div id="anim-modal" class="anim-modal hidden">
+                <div class="anim-modal-bg"></div>
+                <div class="anim-modal-content">
+                    <canvas id="anim-modal-canvas"></canvas>
+                    <button id="btn-close-modal" class="modal-close-btn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 18L18 6M6 6l12 12"></path></svg></button>
                 </div>
             </div>
-
-            <!-- State: Complete -->
-            <div id="stateComplete" class="state-view">
-                <div class="complete-panel">
-                    <div class="success-icon">
-                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-                            <polyline points="22 4 12 14.01 9 11.01"/>
-                        </svg>
-                    </div>
-                    <h3>Upload Complete!</h3>
-                    <p class="complete-subtitle">All frames have been uploaded to Roblox</p>
-                    <textarea id="resultOutput" readonly></textarea>
-                    <div class="btn-row">
-                        <button class="action-btn secondary" onclick="resetToIdle()">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
-                            New Upload
-                        </button>
-                        <button class="action-btn primary" onclick="copyResults()">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                            Copy IDs
-                        </button>
-                    </div>
-                </div>
-            </div>
+            
         </main>
     </div>
-
-    <!-- ============ TOAST ============ -->
-    <div id="toastContainer" class="toast-container"></div>
-
-    <script type="text/javascript" src="/eel.js"></script>
-    <script src="main.js"></script>
 </body>
 </html>

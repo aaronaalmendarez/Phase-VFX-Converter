@@ -1,280 +1,784 @@
-/* ========================================================
-   Phase VFX Converter — Application Logic
-   ======================================================== */
+// ============================================
+//  PHASE FLIPBOOK EDITOR — Frontend Logic
+// ============================================
 
-// ── State ──
-let currentBase64 = null;
-let currentStep = 0;
-let isProcessing = false;
+// ---- State ----
+let originalImageB64 = null;
+let currentImageB64 = null;
+let uploadedAssetIds = [];
+let imageHistory = [];
 
-// ── Onboarding ──
-function nextStep() {
-    const steps = document.querySelectorAll('.onboarding-card .step');
-    const dots  = document.querySelectorAll('.dot');
-    steps[currentStep].classList.remove('active');
-    dots[currentStep].classList.remove('active');
-    currentStep++;
-    steps[currentStep].classList.add('active');
-    dots[currentStep].classList.add('active');
-}
-
-function prevStep() {
-    const steps = document.querySelectorAll('.onboarding-card .step');
-    const dots  = document.querySelectorAll('.dot');
-    steps[currentStep].classList.remove('active');
-    dots[currentStep].classList.remove('active');
-    currentStep--;
-    steps[currentStep].classList.add('active');
-    dots[currentStep].classList.add('active');
-}
-
-function finishOnboarding() {
-    const key = document.getElementById('onboardingKey').value.trim();
-    if (!key) {
-        showToast('Please paste your API key first', 'error');
-        return;
+function saveUndoState() {
+    if (currentImageB64) {
+        imageHistory.push(currentImageB64);
+        if (imageHistory.length > 20) imageHistory.shift(); // Limit stack size
     }
-    // Transfer key to main sidebar
-    document.getElementById('apiKey').value = key;
-
-    const overlay = document.getElementById('onboarding');
-    overlay.classList.add('closing');
-    setTimeout(() => { overlay.style.display = 'none'; }, 500);
 }
 
-function showOnboarding() {
-    const overlay = document.getElementById('onboarding');
-    overlay.style.display = 'flex';
-    overlay.classList.remove('closing');
-    // Reset to step 0
-    currentStep = 0;
-    document.querySelectorAll('.onboarding-card .step').forEach((s, i) => s.classList.toggle('active', i === 0));
-    document.querySelectorAll('.dot').forEach((d, i) => d.classList.toggle('active', i === 0));
-}
+// ---- DOM Helpers ----
+const $ = id => document.getElementById(id);
+const canvas = $('preview-canvas');
+const ctx = canvas.getContext('2d');
+const animCanvas = $('anim-canvas');
+const animCtx = animCanvas.getContext('2d');
 
-function openExternal(url) {
-    // In Eel context, try to open in system browser
-    try { window.open(url); } catch(e) {}
-}
+// ---- Animation State ----
+let animTimer = null;
+let currentFrame = 0;
+let isPlaying = true;
 
-// ── Toggle Key Visibility ──
-function toggleKeyVis(btn) {
-    const input = btn.closest('.onboarding-input-wrap, .input-with-icon').querySelector('input');
-    input.type = input.type === 'password' ? 'text' : 'password';
-}
+// ---- Camera State ----
+let camX = 0, camY = 0, camZoom = 1;
+let isPanning = false, startX, startY;
+const viewportLayer = document.getElementById('canvas-transform-layer');
+const viewportContainer = document.getElementById('canvas-viewport');
 
-// ── Grid Updates ──
-const gridCols  = document.getElementById('gridCols');
-const gridRows  = document.getElementById('gridRows');
-const gridTotal = document.getElementById('gridTotal');
+// SVG Icons
+const SVG_PLAY = '<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M6 4l15 8-15 8z"></path></svg>';
+const SVG_PAUSE = '<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M6 4h4v16H6zm8 0h4v16h-4z"></path></svg>';
 
-function updateGridTotal() {
-    const c = parseInt(gridCols.value) || 0;
-    const r = parseInt(gridRows.value) || 0;
-    gridTotal.textContent = `= ${c * r} frames`;
-}
-gridCols.addEventListener('input', updateGridTotal);
-gridRows.addEventListener('input', updateGridTotal);
-
-// ── Drag & Drop ──
-const dropzone       = document.getElementById('dropzone');
-const dropContent    = document.getElementById('dropContent');
-const imagePreview   = document.getElementById('imagePreview');
-const uploadBtn      = document.getElementById('uploadBtn');
-
-dropzone.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    if (!isProcessing) dropzone.classList.add('dragover');
+// ============================================
+//  TAB NAVIGATION
+// ============================================
+document.querySelectorAll('.nav-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        btn.classList.add('active');
+        $(`tab-${btn.dataset.tab}`).classList.add('active');
+    });
 });
-dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
-dropzone.addEventListener('drop', (e) => {
+
+// ============================================
+//  GPU AUTO-DETECT + MODE TOGGLE
+// ============================================
+let detectedGpuInfo = null;
+
+async function initGpuInfo() {
+    try {
+        const info = await eel.get_gpu_info()();
+        detectedGpuInfo = info;
+
+        const nameEl = $('gpu-info-name');
+        const detailEl = $('gpu-info-detail');
+        const card = $('gpu-info-card');
+        const chip = $('gpu-status-chip');
+
+        if (info.name) {
+            nameEl.textContent = info.name;
+            const vram = info.vram_mb >= 1024
+                ? (info.vram_mb / 1024).toFixed(0) + ' GB VRAM'
+                : info.vram_mb + ' MB VRAM';
+            let detail = vram;
+            if (info.driver) detail += ` · Driver ${info.driver}`;
+            detailEl.textContent = detail;
+
+            if (info.is_rtx) {
+                card.classList.add('gpu-card-rtx');
+                nameEl.innerHTML = `<img class="rtx-badge" src="icons/rtx-badge.png" alt="RTX"> ${info.name.replace(/NVIDIA\s*GeForce\s*/i, '')}`;
+            }
+
+            // Update bottom bar chip
+            if (info.has_cuda && chip) {
+                chip.className = 'gpu-chip gpu-chip-cuda';
+                chip.querySelector('span').textContent = 'CUDA · ' + info.name.replace(/NVIDIA\s*GeForce\s*/i, '');
+            } else if (info.has_dml && chip) {
+                chip.className = 'gpu-chip gpu-chip-dml';
+                chip.querySelector('span').textContent = 'DirectML';
+            }
+
+            log(`GPU detected: ${info.name} (${vram})`);
+        } else {
+            nameEl.textContent = 'No GPU Detected';
+            detailEl.textContent = 'AI will run on CPU';
+            card.classList.add('gpu-card-none');
+            if (chip) {
+                chip.className = 'gpu-chip gpu-chip-cpu';
+                chip.querySelector('span').textContent = 'CPU Only';
+            }
+        }
+
+        // Disable GPU button if no GPU providers
+        if (!info.has_cuda && !info.has_dml) {
+            const gpuBtn = $('mode-gpu');
+            gpuBtn.disabled = true;
+            gpuBtn.classList.remove('active');
+            $('mode-cpu').classList.add('active');
+        }
+    } catch (e) {
+        console.warn('GPU detection failed:', e);
+        $('gpu-info-name').textContent = 'Detection Failed';
+    }
+}
+
+// Mode toggle buttons
+document.querySelectorAll('.mode-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+        if (btn.disabled) return;
+        const mode = btn.dataset.mode;
+        document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+
+        const res = await eel.set_execution_mode(mode)();
+        if (res.success) {
+            log(`Execution mode: ${res.target}`);
+            const chip = $('gpu-status-chip');
+            if (mode === 'cpu') {
+                chip.className = 'gpu-chip gpu-chip-cpu';
+                chip.querySelector('span').textContent = 'CPU Mode';
+            } else if (detectedGpuInfo) {
+                if (detectedGpuInfo.has_cuda) {
+                    chip.className = 'gpu-chip gpu-chip-cuda';
+                    chip.querySelector('span').textContent = 'CUDA · ' + (detectedGpuInfo.name || 'GPU').replace(/NVIDIA\s*GeForce\s*/i, '');
+                } else if (detectedGpuInfo.has_dml) {
+                    chip.className = 'gpu-chip gpu-chip-dml';
+                    chip.querySelector('span').textContent = 'DirectML';
+                }
+            }
+        }
+    });
+});
+
+// Fire GPU detection after eel is ready
+setTimeout(initGpuInfo, 300);
+
+// ============================================
+//  CANVAS RENDERING
+// ============================================
+function updateCanvas(b64) {
+    if (!b64) return;
+    currentImageB64 = b64;
+    const img = new Image();
+    img.onload = () => {
+        $('canvas-placeholder').classList.add('hidden');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0);
+        drawGrid(img.width, img.height);
+        updateStatBar(img.width, img.height);
+        
+        // Reset Camera to fit
+        const vw = viewportContainer.clientWidth;
+        const vh = viewportContainer.clientHeight;
+        const scale = Math.min((vw - 40) / img.width, (vh - 40) / img.height);
+        camZoom = Math.min(1, scale);
+        camX = (vw - img.width * camZoom) / 2;
+        camY = (vh - img.height * camZoom) / 2;
+        updateTransform();
+        
+        startAnim();
+    };
+    img.src = b64;
+}
+
+function updateTransform() {
+    if(viewportLayer) {
+        viewportLayer.style.transform = `translate(${camX}px, ${camY}px) scale(${camZoom})`;
+    }
+}
+
+// ---- Pan and Zoom Logic ----
+if (viewportContainer) {
+    viewportContainer.addEventListener('wheel', e => {
+        if (!currentImageB64) return;
+        e.preventDefault();
+        const zoomDir = Math.sign(e.deltaY) > 0 ? 0.85 : 1.15;
+        
+        // Zoom relative to pointer
+        const rect = viewportContainer.getBoundingClientRect();
+        const mx = e.clientX - rect.left;
+        const my = e.clientY - rect.top;
+        
+        const oldWx = (mx - camX) / camZoom;
+        const oldWy = (my - camY) / camZoom;
+        
+        camZoom *= zoomDir;
+        camZoom = Math.max(0.05, Math.min(camZoom, 50));
+        
+        camX = mx - oldWx * camZoom;
+        camY = my - oldWy * camZoom;
+        updateTransform();
+    }, { passive: false });
+
+    viewportContainer.addEventListener('mousedown', e => {
+        if (!currentImageB64) return;
+        isPanning = true;
+        startX = e.clientX - camX;
+        startY = e.clientY - camY;
+        viewportContainer.style.cursor = 'grabbing';
+    });
+    window.addEventListener('mousemove', e => {
+        if (!isPanning) return;
+        camX = e.clientX - startX;
+        camY = e.clientY - startY;
+        updateTransform();
+    });
+    window.addEventListener('mouseup', () => {
+        if (isPanning) {
+            isPanning = false;
+            viewportContainer.style.cursor = 'grab';
+        }
+    });
+}
+
+function drawGrid(w, h) {
+    const cols = parseInt($('grid-cols').value) || 1;
+    const rows = parseInt($('grid-rows').value) || 1;
+    const cw = w / cols;
+    const ch = h / rows;
+
+    ctx.save();
+    ctx.strokeStyle = 'rgba(124, 58, 237, 0.35)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([6, 4]);
+    ctx.beginPath();
+    for (let c = 1; c < cols; c++) {
+        ctx.moveTo(c * cw, 0);
+        ctx.lineTo(c * cw, h);
+    }
+    for (let r = 1; r < rows; r++) {
+        ctx.moveTo(0, r * ch);
+        ctx.lineTo(w, r * ch);
+    }
+    ctx.stroke();
+    ctx.restore();
+}
+
+function updateStatBar(w, h) {
+    const cols = parseInt($('grid-cols').value) || 1;
+    const rows = parseInt($('grid-rows').value) || 1;
+    $('stat-size').textContent = `${w} × ${h}`;
+    $('stat-frames').textContent = `${cols * rows}`;
+    $('stat-bar').style.display = 'flex';
+}
+
+// ============================================
+//  ANIMATION PREVIEW
+// ============================================
+function startAnim() {
+    if (animTimer) clearInterval(animTimer);
+    if (!currentImageB64 || !isPlaying) return;
+
+    const cols = parseInt($('grid-cols').value) || 1;
+    const rows = parseInt($('grid-rows').value) || 1;
+    const fps  = parseInt($('anim-fps').value) || 30;
+
+    const img = new Image();
+    img.src = currentImageB64;
+
+    animTimer = setInterval(() => {
+        if (!img.complete || img.naturalWidth === 0) return;
+
+        const fw = img.width / cols;
+        const fh = img.height / rows;
+        const total = cols * rows;
+        currentFrame = (currentFrame + 1) % total;
+
+        const r = Math.floor(currentFrame / cols);
+        const c = currentFrame % cols;
+
+        animCanvas.width = 48;
+        animCanvas.height = 48;
+        animCtx.clearRect(0, 0, 48, 48);
+        animCtx.drawImage(img, c * fw, r * fh, fw, fh, 0, 0, 48, 48);
+
+        // Render to modal if active
+        const modal = $('anim-modal');
+        if (!modal.classList.contains('hidden')) {
+            const mCanvas = $('anim-modal-canvas');
+            const mCtx = mCanvas.getContext('2d');
+            
+            // Calculate a good enlarged size (up to 400px but respecting aspect ratio)
+            const maxDim = 512;
+            const scale = Math.min(maxDim / fw, maxDim / fh);
+            const wScaled = fw * scale;
+            const hScaled = fh * scale;
+
+            if (mCanvas.width !== wScaled || mCanvas.height !== hScaled) {
+                mCanvas.width = wScaled;
+                mCanvas.height = hScaled;
+                mCtx.imageSmoothingEnabled = false; // pixel art scaling
+            }
+
+            mCtx.clearRect(0, 0, wScaled, hScaled);
+            mCtx.drawImage(img, c * fw, r * fh, fw, fh, 0, 0, wScaled, hScaled);
+        }
+    }, 1000 / fps);
+}
+
+$('grid-cols').onchange = () => { if (currentImageB64) updateCanvas(currentImageB64); };
+$('grid-rows').onchange = () => { if (currentImageB64) updateCanvas(currentImageB64); };
+$('anim-fps').onchange  = startAnim;
+
+$('btn-play-pause').onclick = () => {
+    isPlaying = !isPlaying;
+    $('btn-play-pause').innerHTML = isPlaying ? SVG_PAUSE : SVG_PLAY;
+    if (isPlaying) startAnim();
+    else if (animTimer) { clearInterval(animTimer); animTimer = null; }
+};
+
+// ============================================
+//  DRAG AND DROP
+// ============================================
+const dropOverlay = $('drop-zone-overlay');
+
+document.addEventListener('dragover', (e) => {
     e.preventDefault();
-    dropzone.classList.remove('dragover');
-    if (isProcessing) return;
-    const file = e.dataTransfer.files[0];
-    if (file && file.type.startsWith('image/')) {
-        handleFile(file);
+    if (e.dataTransfer && e.dataTransfer.types && e.dataTransfer.types.includes("Files")) {
+        dropOverlay.classList.remove('hidden');
+    }
+});
+
+// ============================================
+//  MODAL LOGIC
+// ============================================
+$('btn-enlarge-anim').onclick = () => {
+    if (!currentImageB64) return;
+    $('anim-modal').classList.remove('hidden');
+    startAnim();
+};
+
+const closeModal = () => {
+    $('anim-modal').classList.add('hidden');
+};
+$('btn-close-modal').onclick = closeModal;
+document.querySelector('.anim-modal-bg').onclick = closeModal;
+
+// ============================================
+//  FILE IMPORT
+// ============================================
+$('btn-browse-image').onclick = async () => {
+    const filepath = await eel.open_file_dialog("image")();
+    if (!filepath) return;
+    log("Loading image...");
+    const res = await eel.load_local_image(filepath)();
+    if (res.success) {
+        originalImageB64 = res.image;
+        updateCanvas(res.image);
+        log("Image loaded successfully.");
     } else {
-        showToast('Please drop a valid image file (PNG/JPG)', 'error');
+        logError(res.error);
+    }
+};
+
+$('btn-browse-video').onclick = async () => {
+    const filepath = await eel.open_file_dialog("video")();
+    if (!filepath) return;
+    log("Extracting video frames — this may take a moment...");
+    showProgress();
+
+    const frames = parseInt($('video-frames').value) || 64;
+    const cols   = parseInt($('grid-cols').value) || 8;
+
+    const res = await eel.video_to_spritesheet(filepath, frames, cols)();
+    if (res.success) {
+        originalImageB64 = res.image;
+        updateCanvas(res.image);
+        $('grid-rows').value = Math.ceil(frames / cols);
+        log("Video converted to spritesheet.");
+    } else {
+        logError(res.error);
+    }
+    hideProgress(1500);
+};
+
+// ---- Drag & Drop ----
+const mainContent = document.querySelector('.main-content');
+const dropZone = $('drop-zone');
+
+mainContent.addEventListener('dragover', e => {
+    e.preventDefault();
+    if (e.dataTransfer && e.dataTransfer.types && e.dataTransfer.types.includes("Files")) {
+        dropZone.classList.add('active');
     }
 });
-dropzone.addEventListener('click', () => {
-    if (isProcessing) return;
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/png, image/jpeg';
-    input.onchange = (e) => { if (e.target.files[0]) handleFile(e.target.files[0]); };
-    input.click();
+mainContent.addEventListener('dragleave', e => {
+    e.preventDefault();
+    dropZone.classList.remove('active');
 });
+mainContent.addEventListener('drop', async e => {
+    e.preventDefault();
+    dropZone.classList.remove('active');
+    const file = e.dataTransfer.files[0];
+    if (!file) return;
 
-function handleFile(file) {
+    log(`Dropped file: ${file.name}`);
+
+    // Read the file as base64 and send to canvas
     const reader = new FileReader();
-    reader.onload = (e) => {
-        currentBase64 = e.target.result;
-        imagePreview.src = currentBase64;
-        imagePreview.classList.add('visible');
-        dropContent.style.display = 'none';
-        dropzone.classList.add('has-image');
-        uploadBtn.classList.add('visible');
-        showToast('Spritesheet loaded!', 'success');
+    reader.onload = () => {
+        originalImageB64 = reader.result;
+        updateCanvas(reader.result);
+        log("Drag-and-drop image loaded.");
     };
     reader.readAsDataURL(file);
+});
+
+// ============================================
+//  SAVE LOCAL
+// ============================================
+$('btn-save-local').onclick = async () => {
+    if (!currentImageB64) return;
+    const filepath = await eel.save_file_dialog()();
+    if (!filepath) return;
+    const res = await eel.save_local_image(filepath, currentImageB64)();
+    if (res.success) log("Saved locally: " + filepath);
+    else logError(res.error);
+};
+
+// ============================================
+//  ADJUSTMENTS — SLIDERS
+// ============================================
+const SLIDER_KEYS = ['brightness', 'contrast', 'saturation', 'sharpness'];
+
+function refreshSliderLabels() {
+    SLIDER_KEYS.forEach(k => {
+        $('val-' + k).innerText = parseFloat($('slider-' + k).value).toFixed(2);
+    });
 }
+document.querySelectorAll('input[type="range"]').forEach(el => {
+    el.addEventListener('input', refreshSliderLabels);
+});
 
-// ── State Transitions ──
-function showState(stateId) {
-    document.querySelectorAll('.state-view').forEach(v => v.classList.remove('active'));
-    document.getElementById(stateId).classList.add('active');
-}
-
-function resetToIdle() {
-    currentBase64 = null;
-    imagePreview.src = '';
-    imagePreview.classList.remove('visible');
-    dropContent.style.display = '';
-    dropzone.classList.remove('has-image');
-    uploadBtn.classList.remove('visible');
-    showState('stateIdle');
-}
-
-// ── Upload Flow ──
-async function startUpload() {
-    const apiKey    = document.getElementById('apiKey').value.trim();
-    const creatorId = document.getElementById('creatorId').value.trim();
-    const cols      = parseInt(gridCols.value);
-    const rows      = parseInt(gridRows.value);
-    const isGroup   = document.getElementById('radioGroup').checked;
-
-    // Validate
-    if (!apiKey)       { showToast('Enter your Open Cloud API Key in the sidebar', 'error'); return; }
-    if (!creatorId)    { showToast('Enter your Creator ID in the sidebar', 'error'); return; }
-    if (!currentBase64){ showToast('Drop an image first', 'error'); return; }
-    if (isNaN(cols) || isNaN(rows) || cols < 1 || rows < 1) {
-        showToast('Invalid grid dimensions', 'error');
-        return;
+$('btn-apply-filters').onclick = async () => {
+    if (!currentImageB64) return;
+    log("Applying filters...");
+    const adjs = {};
+    SLIDER_KEYS.forEach(k => { adjs[k] = parseFloat($('slider-' + k).value); });
+    const res = await eel.edit_image(currentImageB64, adjs)();
+    if (res.success) {
+        saveUndoState();
+        updateCanvas(res.image);
+        log("Filters applied.");
+    } else {
+        logError(res.error);
     }
+};
 
-    isProcessing = true;
-    showState('stateUploading');
+$('btn-revert').onclick = () => {
+    if (!originalImageB64) return;
+    saveUndoState();
+    updateCanvas(originalImageB64);
+    SLIDER_KEYS.forEach(k => { $('slider-' + k).value = 1.0; });
+    refreshSliderLabels();
+    log("Reverted to original image.");
+};
 
-    document.getElementById('spinnerPercent').textContent = '0%';
-    document.getElementById('uploadStatusTitle').textContent = 'Slicing frames...';
-    document.getElementById('uploadDetail').textContent = 'Preparing your spritesheet';
-    document.getElementById('progressFill').style.width = '0%';
-    document.getElementById('frameCounter').textContent = `0 / ${cols * rows}`;
+$('btn-undo').onclick = () => {
+    if (imageHistory.length > 0) {
+        const prev = imageHistory.pop();
+        updateCanvas(prev);
+        log("Undo successful.");
+    } else {
+        logError("Nothing to undo!");
+    }
+};
 
-    try {
-        const result = await eel.slice_and_upload(
-            currentBase64, cols, rows, creatorId, isGroup, apiKey
-        )();
+// ============================================
+//  ADJUSTMENTS — PRESETS
+// ============================================
+const PRESETS = {
+    reset:     { brightness: 1.0,  contrast: 1.0,  saturation: 1.0,  sharpness: 1.0  },
+    vivid:     { brightness: 1.05, contrast: 1.2,  saturation: 1.6,  sharpness: 1.3  },
+    cinematic: { brightness: 0.9,  contrast: 1.35, saturation: 0.8,  sharpness: 1.0  },
+    sharp:     { brightness: 1.0,  contrast: 1.1,  saturation: 1.0,  sharpness: 2.5  },
+    muted:     { brightness: 0.95, contrast: 0.85, saturation: 0.5,  sharpness: 0.8  },
+};
 
-        isProcessing = false;
+document.querySelectorAll('.preset-chip').forEach(chip => {
+    chip.addEventListener('click', async () => {
+        const name = chip.dataset.preset;
+        const p = PRESETS[name];
+        if (!p || !currentImageB64) return;
 
-        if (result && result.success) {
-            showState('stateComplete');
-            const luaTable = "{\n    " + result.ids.join(",\n    ") + "\n}";
-            document.getElementById('resultOutput').value = luaTable;
-            showToast(`Successfully uploaded ${result.ids.length} frames!`, 'success');
+        // Highlight active chip
+        document.querySelectorAll('.preset-chip').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+
+        // Set slider values
+        SLIDER_KEYS.forEach(k => { $('slider-' + k).value = p[k]; });
+        refreshSliderLabels();
+
+        // Apply
+        log(`Applying preset: ${name}...`);
+        const source = name === 'reset' ? originalImageB64 : currentImageB64;
+        const res = await eel.edit_image(source || currentImageB64, p)();
+        if (res.success) {
+            saveUndoState();
+            updateCanvas(res.image);
+            log(`Preset "${name}" applied.`);
         } else {
-            showState('stateIdle');
-            showToast(result?.error || 'Upload failed', 'error');
+            logError(res.error);
         }
-    } catch(err) {
-        isProcessing = false;
-        showState('stateIdle');
-        showToast('Connection error: ' + err.message, 'error');
+    });
+});
+
+// ============================================
+//  BACKGROUND REMOVAL
+// ============================================
+$('btn-bg-dark').onclick = async () => {
+    if (!currentImageB64) return;
+    log("Removing dark backgrounds...");
+    globalProgressShow("Removing dark pixels...", 50);
+    const res = await eel.remove_background(currentImageB64, "dark", 30)();
+    if (res.success) { saveUndoState(); updateCanvas(res.image); log("Dark-pixel background removed."); }
+    else logError(res.error);
+    globalProgressDone();
+};
+
+$('btn-bg-ai').onclick = async () => {
+    if (!currentImageB64) return;
+    log("Running AI Background Removal (Rembg)... First run downloads the model (~170 MB).");
+    globalProgressShow("AI Background Removal in progress...", 15);
+    // Simulate incremental progress for long-running AI task
+    let fakePct = 15;
+    const ticker = setInterval(() => {
+        fakePct = Math.min(fakePct + 2, 90);
+        globalProgressUpdate(fakePct, "AI Background Removal in progress...");
+    }, 800);
+    const res = await eel.remove_background(currentImageB64, "rembg", 30)();
+    clearInterval(ticker);
+    if (res.success) { saveUndoState(); updateCanvas(res.image); log("AI background removal complete."); }
+    else logError(res.error);
+    globalProgressDone();
+};
+
+$('btn-bg-biref').onclick = async () => {
+    if (!currentImageB64) return;
+    log("Running Pro AI Segmentation (BiRefNet)... First run downloads the model (~350 MB).");
+    globalProgressShow("Pro AI Segmentation in progress...", 5);
+    let fakePct = 5;
+    const ticker = setInterval(() => {
+        fakePct = Math.min(fakePct + 1, 95);
+        globalProgressUpdate(fakePct, "Pro AI Segmentation in progress...");
+    }, 1000);
+    
+    // Calls specific BiRefNet route
+    const res = await eel.remove_background(currentImageB64, "birefnet", 30)();
+    clearInterval(ticker);
+    if (res.success) { saveUndoState(); updateCanvas(res.image); log("Pro AI background removal complete."); }
+    else logError(res.error);
+    globalProgressDone();
+};
+
+// ============================================
+//  UPLOAD & REMOTE FETCH
+// ============================================
+$('btn-upload').onclick = async () => {
+    if (!currentImageB64) return alert("Import an image first.");
+    const apiKey   = $('api-key').value;
+    const targetId = $('target-id').value;
+    if (!apiKey || !targetId) return alert("Provide both API Key and Target ID.");
+
+    const isGroup = document.querySelector('input[name="creator_type"]:checked').value === "Group";
+    const cols = parseInt($('grid-cols').value) || 1;
+    const rows = parseInt($('grid-rows').value) || 1;
+
+    showProgress();
+    $('results-area').classList.add('hidden');
+    log("Slicing and uploading to Roblox...");
+
+    const res = await eel.slice_and_upload(currentImageB64, cols, rows, targetId, isGroup, apiKey)();
+
+    if (res.success && res.ids) {
+        uploadedAssetIds = res.ids;
+        $('results-area').classList.remove('hidden');
+        log(`Upload complete — ${res.ids.length} frames uploaded.`);
+    } else {
+        logError(res.error);
     }
+    hideProgress(1500);
+};
+
+$('btn-fetch-remote').onclick = async () => {
+    const assetId = $('remote-asset-id').value;
+    const apiKey  = $('api-key').value;
+    const targetId = $('target-id').value;
+    if (!assetId) return alert("Enter a Roblox Asset ID to fetch.");
+    if (!apiKey || !targetId) return alert("Provide both API Key and Target ID.");
+
+    const isGroup = document.querySelector('input[name="creator_type"]:checked').value === "Group";
+    const cols = parseInt($('grid-cols').value) || 1;
+    const rows = parseInt($('grid-rows').value) || 1;
+
+    showProgress();
+    log(`Fetching remote asset ${assetId}...`);
+
+    const res = await eel.fetch_and_slice(assetId, cols, rows, targetId, isGroup, apiKey)();
+    if (res.success && res.ids) {
+        uploadedAssetIds = res.ids;
+        $('results-area').classList.remove('hidden');
+        log(`Remote fetch & upload complete — ${res.ids.length} frames.`);
+    } else {
+        logError(res.error);
+    }
+    hideProgress(1500);
+};
+
+$('btn-copy').onclick = () => {
+    if (uploadedAssetIds.length === 0) return;
+    const text = '[\n    "' + uploadedAssetIds.join('",\n    "') + '"\n]';
+    navigator.clipboard.writeText(text);
+    $('btn-copy').innerHTML = SVG_COPY + " Copied!";
+    setTimeout(() => { $('btn-copy').innerHTML = SVG_COPY + " Copy IDs"; }, 2000);
+};
+
+// ============================================
+//  GLOBAL PROGRESS BAR
+// ============================================
+function globalProgressShow(label, pct) {
+    const el = $('global-progress');
+    el.classList.remove('hidden');
+    globalProgressUpdate(pct || 0, label || 'Processing...');
 }
 
-async function startCloudUpload() {
-    const apiKey    = document.getElementById('apiKey').value.trim();
-    const creatorId = document.getElementById('creatorId').value.trim();
-    const cols      = parseInt(gridCols.value);
-    const rows      = parseInt(gridRows.value);
-    const isGroup   = document.getElementById('radioGroup').checked;
-    const assetId   = document.getElementById('cloudAssetId').value.trim();
-
-    // Validate
-    if (!apiKey)       { showToast('Enter your Open Cloud API Key in the sidebar', 'error'); return; }
-    if (!creatorId)    { showToast('Enter your Creator ID in the sidebar', 'error'); return; }
-    if (!assetId)      { showToast('Enter a valid Roblox Asset ID', 'error'); return; }
-    if (isNaN(cols) || isNaN(rows) || cols < 1 || rows < 1) {
-        showToast('Invalid grid dimensions', 'error');
-        return;
-    }
-
-    isProcessing = true;
-    showState('stateUploading');
-
-    document.getElementById('spinnerPercent').textContent = '0%';
-    document.getElementById('uploadStatusTitle').textContent = 'Fetching Asset...';
-    document.getElementById('uploadDetail').textContent = 'Downloading image from Roblox servers';
-    document.getElementById('progressFill').style.width = '0%';
-    document.getElementById('frameCounter').textContent = `0 / ${cols * rows}`;
-
-    try {
-        const result = await eel.fetch_and_slice(
-            assetId, cols, rows, creatorId, isGroup, apiKey
-        )();
-
-        isProcessing = false;
-
-        if (result && result.success) {
-            showState('stateComplete');
-            const luaTable = "{\n    " + result.ids.join(",\n    ") + "\n}";
-            document.getElementById('resultOutput').value = luaTable;
-            showToast(`Successfully sliced and uploaded ${result.ids.length} frames!`, 'success');
-        } else {
-            showState('stateIdle');
-            showToast(result?.error || 'Upload failed', 'error');
-        }
-    } catch(err) {
-        isProcessing = false;
-        showState('stateIdle');
-        showToast('Connection error: ' + err.message, 'error');
-    }
+function globalProgressUpdate(pct, label) {
+    $('global-progress-fill').style.setProperty('--progress-pct', Math.max(3, pct) + '%');
+    if (label) $('global-progress-label').textContent = label;
 }
 
-// ── Copy Results ──
-function copyResults() {
-    const textarea = document.getElementById('resultOutput');
-    textarea.select();
-    document.execCommand('copy');
-    showToast('Copied to clipboard!', 'success');
-}
-
-// ── Toast System ──
-function showToast(message, type = 'info') {
-    const container = document.getElementById('toastContainer');
-    const toast = document.createElement('div');
-    toast.className = `toast ${type}`;
-    toast.innerHTML = `<span class="toast-dot"></span>${message}`;
-    container.appendChild(toast);
-
+function globalProgressDone() {
+    globalProgressUpdate(100, 'Done.');
     setTimeout(() => {
-        toast.classList.add('leaving');
-        setTimeout(() => toast.remove(), 300);
-    }, 3000);
+        $('global-progress').classList.add('hidden');
+        globalProgressUpdate(0, '');
+    }, 1200);
 }
 
-// ── Eel Callbacks (called from Python) ──
+// Legacy per-tab progress (Upload tab)
+function showProgress(pct) {
+    $('progress-container').classList.remove('hidden');
+    $('progress-fill').style.width = (pct || 0) + '%';
+    globalProgressShow('Uploading...', pct);
+}
+function hideProgress(delay) {
+    setTimeout(() => $('progress-container').classList.add('hidden'), delay || 0);
+    globalProgressDone();
+}
+
+// ============================================
+//  EEL CALLBACKS
+// ============================================
 eel.expose(update_progress);
-function update_progress(current, total, message) {
-    const pct = Math.round((current / total) * 100);
-    document.getElementById('spinnerPercent').textContent = pct + '%';
-    document.getElementById('progressFill').style.width = pct + '%';
-    document.getElementById('uploadStatusTitle').textContent = `Uploading frame ${current}/${total}`;
-    document.getElementById('uploadDetail').textContent = message;
-    document.getElementById('frameCounter').textContent = `${current} / ${total}`;
+function update_progress(current, total, msg) {
+    const pct = Math.max(3, (current / total) * 100);
+    // Update tab-local progress
+    $('progress-fill').style.width = pct + '%';
+    if (msg) $('progress-text').innerText = msg;
+    // Update global bar
+    globalProgressUpdate(pct, msg);
+    if (msg) log(msg);
 }
 
 eel.expose(log_message);
-function log_message(msg) {
-    console.log('[Phase]', msg);
-}
+function log_message(msg) { log(msg); }
 
 eel.expose(log_error);
-function log_error(err) {
-    console.error('[Phase Error]', err);
-    showToast(err, 'error');
+function log_error(msg) { logError(msg); }
+
+// ============================================
+//  LOGGING + GPU TOAST SYSTEM
+// ============================================
+const GPU_KEYWORDS = ['CUDA', 'GPU', 'DirectML', 'NVIDIA', 'TensorRT', 'Segmentation', 'AI', 'BiRefNet', 'rembg', 'Model', 'ML'];
+const TOAST_ICONS = {
+    gpu: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4" y="6" width="16" height="12" rx="2"/><path d="M8 6V4m4 2V4m4 2V4M8 18v2m4-2v2m4-2v2"/><circle cx="12" cy="12" r="2"/></svg>',
+    ai: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>',
+    success: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>',
+    info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>',
+    error: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>',
+    download: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3 3m0 0l-3-3m3 3V8"/></svg>'
+};
+
+function _classifyMessage(msg) {
+    const m = msg.toLowerCase();
+    if (m.includes('error') || m.includes('fail')) return { type: 'error', icon: TOAST_ICONS.error };
+    if (m.includes('download')) return { type: 'download', icon: TOAST_ICONS.download };
+    if (m.includes('cuda') || m.includes('directml') || m.includes('nvidia') || m.includes('tensorrt') || m.includes('gpu'))
+        return { type: 'gpu', icon: TOAST_ICONS.gpu };
+    if (m.includes('birefnet') || m.includes('rembg') || m.includes('segmentation') || m.includes('ai') || m.includes('ml') || m.includes('model'))
+        return { type: 'ai', icon: TOAST_ICONS.ai };
+    if (m.includes('complete') || m.includes('success') || m.includes('done') || m.includes('saved'))
+        return { type: 'success', icon: TOAST_ICONS.success };
+    return { type: 'info', icon: TOAST_ICONS.info };
+}
+
+let _activeToasts = [];
+const MAX_TOASTS = 4;
+
+function _spawnToast(msg, classification) {
+    const container = $('toast-container');
+    if (!container) return;
+
+    // Remove oldest if over limit
+    while (_activeToasts.length >= MAX_TOASTS) {
+        const oldest = _activeToasts.shift();
+        if (oldest && oldest.parentNode) {
+            oldest.classList.add('toast-exit');
+            setTimeout(() => oldest.remove(), 300);
+        }
+    }
+
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${classification.type}`;
+    toast.innerHTML = `
+        <div class="toast-icon">${classification.icon}</div>
+        <div class="toast-body">
+            <span class="toast-msg">${msg}</span>
+        </div>
+    `;
+    container.appendChild(toast);
+    _activeToasts.push(toast);
+
+    // Auto-dismiss
+    const duration = classification.type === 'error' ? 6000 : classification.type === 'gpu' ? 4500 : 3500;
+    setTimeout(() => {
+        toast.classList.add('toast-exit');
+        setTimeout(() => {
+            toast.remove();
+            _activeToasts = _activeToasts.filter(t => t !== toast);
+        }, 400);
+    }, duration);
+}
+
+function _updateGpuChip(msg) {
+    const chip = $('gpu-status-chip');
+    if (!chip) return;
+    const m = msg.toLowerCase();
+    if (m.includes('cuda')) {
+        chip.className = 'gpu-chip gpu-chip-cuda';
+        chip.innerHTML = TOAST_ICONS.gpu + '<span>CUDA GPU</span>';
+    } else if (m.includes('directml')) {
+        chip.className = 'gpu-chip gpu-chip-dml';
+        chip.innerHTML = TOAST_ICONS.gpu + '<span>DirectML</span>';
+    } else if (m.includes('cpu')) {
+        chip.className = 'gpu-chip gpu-chip-cpu';
+        chip.innerHTML = TOAST_ICONS.gpu + '<span>CPU</span>';
+    }
+}
+
+function log(msg) {
+    if (!msg) return;
+    // Sidebar log (history)
+    const el = $('global-log');
+    const ts = new Date().toLocaleTimeString();
+    const classification = _classifyMessage(msg);
+    el.innerHTML = `<div class="log-entry log-${classification.type}"><span class="log-time">[${ts}]</span> ${msg}</div>` + el.innerHTML;
+    while (el.children.length > 80) el.removeChild(el.lastChild);
+
+    // Floating toast on canvas
+    _spawnToast(msg, classification);
+
+    // Update GPU chip if relevant
+    if (GPU_KEYWORDS.some(kw => msg.toLowerCase().includes(kw.toLowerCase()))) {
+        _updateGpuChip(msg);
+    }
+}
+
+function logError(msg) {
+    if (!msg) return;
+    const el = $('global-log');
+    const ts = new Date().toLocaleTimeString();
+    el.innerHTML = `<div class="log-entry log-error"><span class="log-time">[${ts}]</span> ERROR: ${msg}</div>` + el.innerHTML;
+    _spawnToast('ERROR: ' + msg, { type: 'error', icon: TOAST_ICONS.error });
 }

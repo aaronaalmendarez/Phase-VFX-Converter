@@ -1,5 +1,6 @@
 @echo off
 setlocal
+set "BASE_DEPS=eel pillow requests numpy opencv-python-headless rembg huggingface_hub onnxruntime-gpu"
 
 :: Set title and color
 title Phase VFX Converter
@@ -24,16 +25,17 @@ if %errorlevel% neq 0 (
 if not exist venv\Scripts\activate.bat (
     echo [*] First time setup: Creating Virtual Environment...
     python -m venv venv
-    
-    echo [*] Activating Virtual Environment...
-    call venv\Scripts\activate.bat
-    
-    echo [*] Installing dependencies. This might take a moment...
+)
+
+echo [*] Activating Virtual Environment...
+call venv\Scripts\activate.bat
+
+python -c "import importlib.util, sys; required=['eel','PIL','requests','numpy','cv2','rembg','huggingface_hub']; import onnxruntime as ort; sys.exit(0 if all(importlib.util.find_spec(n) for n in required) and 'CUDAExecutionProvider' in ort.get_available_providers() else 1)" >nul 2>&1
+if %errorlevel% neq 0 (
+    echo [*] Installing / repairing app dependencies...
     pip install --upgrade pip
-    pip install eel pillow requests
-) else (
-    :: Already exists, just activate
-    call venv\Scripts\activate.bat
+    pip uninstall -y onnxruntime onnxruntime-directml >nul 2>&1
+    pip install %BASE_DEPS%
 )
 
 echo [*] Launching Phase Converter...

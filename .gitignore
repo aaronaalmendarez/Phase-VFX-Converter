@@ -3,7 +3,8 @@ __pycache__/
 *.pyc
 .env
 dist/
+dist_mac/
 build/
-*.spec
 *.exe
 *.app
+NVIDIA Corporation/
