@@ -29,6 +29,44 @@ MODEL_SESSION_CACHE = {}
 DLL_DIRECTORY_HANDLES = []
 REGISTERED_DLL_DIRS = set()
 EXECUTION_MODE = "gpu"  # "gpu" or "cpu" — toggled from the frontend
+SETTINGS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "user_settings.json")
+
+
+def _load_settings_from_disk():
+    """Read persisted user settings from disk."""
+    if not os.path.exists(SETTINGS_FILE):
+        return {}
+    try:
+        with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def _save_settings_to_disk(data):
+    """Write user settings to disk."""
+    try:
+        with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+        return True
+    except Exception:
+        return False
+
+
+@eel.expose
+def load_settings():
+    """Return saved settings to the frontend on startup."""
+    return _load_settings_from_disk()
+
+
+@eel.expose
+def save_settings(settings):
+    """Persist settings from the frontend (API key, target ID, creator type)."""
+    existing = _load_settings_from_disk()
+    existing.update(settings)
+    ok = _save_settings_to_disk(existing)
+    return {"success": ok}
+
 
 @eel.expose
 def open_file_dialog(dialog_type="image"):
@@ -36,7 +74,16 @@ def open_file_dialog(dialog_type="image"):
         return None
     file_types = [("All Files", "*.*")]
     if dialog_type == "image":
-        file_types = [("Image Files", "*.png;*.jpg;*.jpeg;*.gif;*.bmp")]
+        file_types = [
+            ("Image Files", "*.png;*.jpg;*.jpeg;*.gif;*.bmp;*.webp;*.tiff;*.tif;*.ico;*.tga"),
+            ("PNG", "*.png"),
+            ("JPEG", "*.jpg;*.jpeg"),
+            ("WebP", "*.webp"),
+            ("GIF", "*.gif"),
+            ("BMP", "*.bmp"),
+            ("TIFF", "*.tiff;*.tif"),
+            ("All Files", "*.*"),
+        ]
     elif dialog_type == "video":
         file_types = [("Video Files", "*.mp4;*.avi;*.mov;*.mkv;*.gif")]
         

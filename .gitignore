@@ -8,3 +8,4 @@ build/
 *.exe
 *.app
 NVIDIA Corporation/
+user_settings.json

@@ -143,6 +143,45 @@ document.querySelectorAll('.mode-btn').forEach(btn => {
 setTimeout(initGpuInfo, 300);
 
 // ============================================
+//  SETTINGS PERSISTENCE (API key, target ID)
+// ============================================
+async function initSettings() {
+    try {
+        const s = await eel.load_settings()();
+        if (s.api_key) $('api-key').value = s.api_key;
+        if (s.target_id) $('target-id').value = s.target_id;
+        if (s.creator_type) {
+            const radio = document.querySelector(`input[name="creator_type"][value="${s.creator_type}"]`);
+            if (radio) radio.checked = true;
+        }
+    } catch (e) {
+        console.warn('Failed to load settings:', e);
+    }
+}
+
+function saveSettingsDebounced() {
+    clearTimeout(saveSettingsDebounced._timer);
+    saveSettingsDebounced._timer = setTimeout(() => {
+        const creatorRadio = document.querySelector('input[name="creator_type"]:checked');
+        eel.save_settings({
+            api_key: $('api-key').value,
+            target_id: $('target-id').value,
+            creator_type: creatorRadio ? creatorRadio.value : 'User'
+        })();
+    }, 500);
+}
+
+// Auto-save on input change
+$('api-key').addEventListener('input', saveSettingsDebounced);
+$('target-id').addEventListener('input', saveSettingsDebounced);
+document.querySelectorAll('input[name="creator_type"]').forEach(r => {
+    r.addEventListener('change', saveSettingsDebounced);
+});
+
+// Load settings on startup
+setTimeout(initSettings, 400);
+
+// ============================================
 //  CANVAS RENDERING
 // ============================================
 function updateCanvas(b64) {
