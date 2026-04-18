@@ -637,6 +637,16 @@ function _getMaskParams() {
 }
 $('luma-threshold').oninput = function() { $('val-luma-thresh').textContent = this.value; };
 
+$('btn-reset-mask').onclick = () => {
+    $('mask-threshold').value = 128; $('val-mask-thresh').textContent = '128';
+    $('edge-refine').value = 1; $('val-edge-refine').textContent = '1';
+    $('feather-radius').value = 0; $('val-feather').textContent = '0';
+    $('mask-pixel-art').checked = false;
+};
+
+$('btn-reset-vfx').onclick = () => {
+    $('luma-threshold').value = 15; $('val-luma-thresh').textContent = '15';
+};
 $('btn-bg-dark').onclick = async () => {
     if (!currentImageB64) return;
     log("Applying VFX Unmultiply (Luma Key)...");

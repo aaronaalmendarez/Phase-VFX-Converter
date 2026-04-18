@@ -90,7 +90,10 @@
                 <button id="btn-bg-biref" class="action-btn ai-btn large" style="margin-bottom: 8px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg> Pro AI (BiRefNet)</button>
                 <button id="btn-bg-ai" class="action-btn ai-btn large"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path></svg> AI Removal (Rembg)</button>
                 
-                <h3 class="section-heading">Mask Refinement</h3>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; margin-top: 32px;">
+                    <h3 class="section-heading" style="margin: 0;">Mask Refinement</h3>
+                    <button id="btn-reset-mask" class="action-btn outline" style="padding: 4px 10px; font-size: 10px; height: auto; border-color: rgba(255,255,255,0.1); color: rgba(255,255,255,0.6);"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 12px; height: 12px; margin-right: 4px;"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg> Default</button>
+                </div>
                 <div class="setting-group" style="margin-bottom: 16px;">
                     <div class="slider-group">
                         <label>Sensitivity <span class="val-badge" id="val-mask-thresh">128</span></label>
@@ -110,24 +113,28 @@
                     </div>
                     <p class="subtitle" style="margin-top: -4px; margin-bottom: 12px; font-size: 10px;">Softens mask edges. Good for glow/smoke effects.</p>
 
-                    <label class="checkbox-container" style="margin-top: 12px; font-size: 13px;">
-                        <input type="checkbox" id="mask-pixel-art">
-                        <span class="checkmark"></span>
+                    <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; margin-top: 16px; margin-bottom: 6px; color: #e2e8f0; font-weight: 500;">
+                        <input type="checkbox" id="mask-pixel-art" style="width: 16px; height: 16px; accent-color: #8b5cf6; cursor: pointer; margin: 0;">
                         Pixel Art Mode (Hard Cutout)
                     </label>
-                    <p class="subtitle" style="margin-top: 4px; font-size: 10px;">Forces strict binary edges and NEAREST scaling to prevent blurry halos. Best for sprites.</p>
+                    <p class="subtitle" style="margin-top: 0px; font-size: 10px;">Forces strict binary edges and NEAREST scaling to prevent blurry halos. Best for sprites.</p>
                 </div>
 
-                <h3 class="section-heading">VFX Compositing Modes</h3>
-                <p class="subtitle" style="margin-bottom: 12px;">Perfect for neon, fire, smoke, and magic effects shot on black backgrounds.</p>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; margin-top: 32px;">
+                    <h3 class="section-heading" style="margin: 0;">VFX Compositing Modes</h3>
+                    <button id="btn-reset-vfx" class="action-btn outline" style="padding: 4px 10px; font-size: 10px; height: auto; border-color: rgba(255,255,255,0.1); color: rgba(255,255,255,0.6);"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 12px; height: 12px; margin-right: 4px;"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg> Default</button>
+                </div>
+                <p class="subtitle" style="margin-bottom: 12px; margin-top: -8px;">Perfect for neon, fire, smoke, and magic effects shot on black backgrounds.</p>
+                
                 <div class="setting-group" style="margin-bottom: 12px;">
                     <div class="slider-group">
                         <label>Black Clip Threshold <span class="val-badge" id="val-luma-thresh">15</span></label>
                         <input type="range" id="luma-threshold" min="0" max="100" value="15" step="1">
                     </div>
-                    <p class="subtitle" style="margin-top: -4px; margin-bottom: 0px; font-size: 10px;">Removes compression noise & grey haze while preserving soft, smooth glows.</p>
+                    <p class="subtitle" style="margin-top: -4px; margin-bottom: 0px; font-size: 10px;">Removes compression noise & grey haze while preserving soft glows.</p>
                 </div>
-                <button id="btn-bg-dark" class="action-btn outline" style="border-color: rgba(255,255,255,0.1);"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg> Unmultiply Black (Luma Key)</button>
+                
+                <button id="btn-bg-dark" class="action-btn outline" style="border-color: rgba(255,255,255,0.1); width: 100%; justify-content: center;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 8px;"><path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg> Unmultiply Black (Luma Key)</button>
             </div>
 
             <!-- ======== TAB: ADJUSTMENTS ======== -->
