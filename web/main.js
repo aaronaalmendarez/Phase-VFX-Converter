@@ -650,11 +650,6 @@ function _getOverlayMousePos(e) {
 }
 
 function _hitTestHandle(mx, my) {
-    const m = maskEditor.current;
-    const tolerance = 0.03; // 3% of canvas
-    const corners = {
-        'nw': [m.x, m.y],
-function _hitTestHandle(mx, my) {
     const rect = _overlayEl().getBoundingClientRect();
     const pxX = mx * rect.width;
     const pxY = my * rect.height;
