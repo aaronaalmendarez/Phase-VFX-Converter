@@ -459,34 +459,80 @@ def run_birefnet_onnx(img):
     execution_target = _describe_execution_target(active_providers)
     print(f"[*] ONNX mapped BiRefNet to: {execution_target}")
     eel.update_progress(1, 1, f"Running High-Res Segmentation on {execution_target}...")
-        
+
+    MODEL_RES = 1024
     orig_w, orig_h = img.size
-    
-    # Preprocess (1024x1024, RGB, NCHW, normalized)
-    input_img = img.convert("RGB").resize((1024, 1024), Image.Resampling.BILINEAR)
-    im_arr = np.array(input_img).astype(np.float32) / 255.0
+
+    # ── Preserve existing alpha (spritesheets may already have transparency) ──
+    orig_alpha = None
+    if img.mode == "RGBA":
+        orig_alpha = np.array(img.split()[3])
+
+    # ── Preprocess: aspect-ratio-preserving resize with padding ──
+    # Stretching non-square sprites to 1024x1024 distorts them and hurts segmentation.
+    # Instead, we fit the image inside the square and pad with black.
+    rgb_img = img.convert("RGB")
+    scale = min(MODEL_RES / orig_w, MODEL_RES / orig_h)
+    new_w, new_h = int(orig_w * scale), int(orig_h * scale)
+    # LANCZOS preserves sharp pixel-art edges better than BILINEAR
+    resized = rgb_img.resize((new_w, new_h), Image.Resampling.LANCZOS)
+
+    # Pad to MODEL_RES x MODEL_RES (center the image on a black canvas)
+    pad_left = (MODEL_RES - new_w) // 2
+    pad_top = (MODEL_RES - new_h) // 2
+    padded = Image.new("RGB", (MODEL_RES, MODEL_RES), (0, 0, 0))
+    padded.paste(resized, (pad_left, pad_top))
+
+    # Normalize with ImageNet stats
+    im_arr = np.array(padded).astype(np.float32) / 255.0
     mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
     std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
     im_arr = (im_arr - mean) / std
-    im_arr = np.transpose(im_arr, (2, 0, 1))
-    im_arr = np.expand_dims(im_arr, axis=0)
-    
-    # Infer
+    im_arr = np.transpose(im_arr, (2, 0, 1))  # HWC → CHW
+    im_arr = np.expand_dims(im_arr, axis=0)    # add batch dim
+
+    # ── Infer ──
     input_name = session.get_inputs()[0].name
     outputs = session.run(None, {input_name: im_arr})
     pred = outputs[0]
-    
-    # Postprocess
+
+    # ── Postprocess ──
     pred = np.squeeze(pred)
-    # Apply sigmoid
+    # Sigmoid activation
     pred = 1.0 / (1.0 + np.exp(-np.clip(pred, -10, 10)))
-    pred = (pred * 255.0).clip(0, 255).astype(np.uint8)
-    
-    mask_img = Image.fromarray(pred, mode="L")
-    mask_img = mask_img.resize((orig_w, orig_h), Image.Resampling.BILINEAR)
-    
+
+    # Crop the padded region back to the actual image area
+    pred = pred[pad_top:pad_top + new_h, pad_left:pad_left + new_w]
+
+    # ── Morphological cleanup (tuned for VFX/particles) ──
+    # Particles, smoke, and glow effects often have semi-transparent edges
+    # and small holes that the model under-segments.
+    mask_u8 = (pred * 255.0).clip(0, 255).astype(np.uint8)
+
+    # Closing: fill small holes inside particle/glow regions
+    kernel_close = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+    mask_u8 = cv2.morphologyEx(mask_u8, cv2.MORPH_CLOSE, kernel_close, iterations=1)
+
+    # Opening: remove tiny noise dots in the background
+    kernel_open = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2, 2))
+    mask_u8 = cv2.morphologyEx(mask_u8, cv2.MORPH_OPEN, kernel_open, iterations=1)
+
+    # Resize mask back to original dimensions (LANCZOS for sharp edges)
+    mask_img = Image.fromarray(mask_u8, mode="L")
+    mask_img = mask_img.resize((orig_w, orig_h), Image.Resampling.LANCZOS)
+
+    # ── Compose final RGBA ──
     result = img.convert("RGBA")
-    result.putalpha(mask_img)
+    new_alpha = np.array(mask_img)
+
+    # If the original image already had transparency, combine (intersection):
+    # only keep pixels that both the original and the model agree should be visible.
+    if orig_alpha is not None:
+        combined = np.minimum(orig_alpha, new_alpha)
+        result.putalpha(Image.fromarray(combined, mode="L"))
+    else:
+        result.putalpha(mask_img)
+
     return result
 
 @eel.expose
