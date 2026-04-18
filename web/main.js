@@ -654,12 +654,21 @@ function _hitTestHandle(mx, my) {
     const tolerance = 0.03; // 3% of canvas
     const corners = {
         'nw': [m.x, m.y],
-        'ne': [m.x + m.w, m.y],
-        'sw': [m.x, m.y + m.h],
-        'se': [m.x + m.w, m.y + m.h],
+function _hitTestHandle(mx, my) {
+    const rect = _overlayEl().getBoundingClientRect();
+    const pxX = mx * rect.width;
+    const pxY = my * rect.height;
+
+    const m = maskEditor.current;
+    const corners = {
+        'nw': [m.x * rect.width, m.y * rect.height],
+        'ne': [(m.x + m.w) * rect.width, m.y * rect.height],
+        'sw': [m.x * rect.width, (m.y + m.h) * rect.height],
+        'se': [(m.x + m.w) * rect.width, (m.y + m.h) * rect.height],
     };
+
     for (const [handle, [cx, cy]] of Object.entries(corners)) {
-        if (Math.abs(mx - cx) < tolerance && Math.abs(my - cy) < tolerance) {
+        if (Math.hypot(pxX - cx, pxY - cy) < 15) { // 15px radius hit area
             return handle;
         }
     }
@@ -687,57 +696,75 @@ document.addEventListener('mousedown', (e) => {
         maskEditor.dragging = true;
         maskEditor.dragStart = { x: pos.x, y: pos.y, ox: maskEditor.current.x, oy: maskEditor.current.y, ow: maskEditor.current.w, oh: maskEditor.current.h };
     } else {
-        // Click outside = start drawing a new shape from this point
-        maskEditor.dragging = false;
-        maskEditor.resizing = true;
-        maskEditor.resizeHandle = 'se';
+        // Click outside = start drawing a new shape freely
+        maskEditor.drawingNew = true;
         maskEditor.current.x = pos.x;
         maskEditor.current.y = pos.y;
-        maskEditor.current.w = 0.01;
-        maskEditor.current.h = 0.01;
-        maskEditor.dragStart = { x: pos.x, y: pos.y, ox: pos.x, oy: pos.y, ow: 0.01, oh: 0.01 };
+        maskEditor.current.w = 0;
+        maskEditor.current.h = 0;
+        maskEditor.dragStart = { x: pos.x, y: pos.y };
     }
+    _renderMaskOverlay(); // instantly render so user sees it right away
 });
 
 document.addEventListener('mousemove', (e) => {
     if (!maskEditor.active) return;
-    if (!maskEditor.dragging && !maskEditor.resizing) return;
+    if (!maskEditor.dragging && !maskEditor.resizing && !maskEditor.drawingNew) return;
 
     const pos = _getOverlayMousePos(e);
-    const dx = pos.x - maskEditor.dragStart.x;
-    const dy = pos.y - maskEditor.dragStart.y;
     const s = maskEditor.dragStart;
 
-    if (maskEditor.dragging) {
+    if (maskEditor.drawingNew) {
+        // Math allows dragging backwards (up/left) natively
+        maskEditor.current.x = Math.min(s.x, pos.x);
+        maskEditor.current.y = Math.min(s.y, pos.y);
+        maskEditor.current.w = Math.max(0.01, Math.abs(pos.x - s.x));
+        maskEditor.current.h = Math.max(0.01, Math.abs(pos.y - s.y));
+    } else if (maskEditor.dragging) {
+        const dx = pos.x - s.x;
+        const dy = pos.y - s.y;
         maskEditor.current.x = s.ox + dx;
         maskEditor.current.y = s.oy + dy;
     } else if (maskEditor.resizing) {
+        const dx = pos.x - s.x;
+        const dy = pos.y - s.y;
         const h = maskEditor.resizeHandle;
         if (h === 'se') {
             maskEditor.current.w = Math.max(0.02, s.ow + dx);
             maskEditor.current.h = Math.max(0.02, s.oh + dy);
         } else if (h === 'sw') {
-            maskEditor.current.x = s.ox + dx;
-            maskEditor.current.w = Math.max(0.02, s.ow - dx);
+            const shiftX = Math.min(dx, s.ow - 0.02);
+            maskEditor.current.x = s.ox + shiftX;
+            maskEditor.current.w = s.ow - shiftX;
             maskEditor.current.h = Math.max(0.02, s.oh + dy);
         } else if (h === 'ne') {
-            maskEditor.current.y = s.oy + dy;
+            const shiftY = Math.min(dy, s.oh - 0.02);
+            maskEditor.current.y = s.oy + shiftY;
             maskEditor.current.w = Math.max(0.02, s.ow + dx);
-            maskEditor.current.h = Math.max(0.02, s.oh - dy);
+            maskEditor.current.h = s.oh - shiftY;
         } else if (h === 'nw') {
-            maskEditor.current.x = s.ox + dx;
-            maskEditor.current.y = s.oy + dy;
-            maskEditor.current.w = Math.max(0.02, s.ow - dx);
-            maskEditor.current.h = Math.max(0.02, s.oh - dy);
+            const shiftX = Math.min(dx, s.ow - 0.02);
+            const shiftY = Math.min(dy, s.oh - 0.02);
+            maskEditor.current.x = s.ox + shiftX;
+            maskEditor.current.y = s.oy + shiftY;
+            maskEditor.current.w = s.ow - shiftX;
+            maskEditor.current.h = s.oh - shiftY;
         }
     }
     _renderMaskOverlay();
 });
 
 document.addEventListener('mouseup', () => {
-    if (maskEditor.dragging || maskEditor.resizing) {
+    if (maskEditor.dragging || maskEditor.resizing || maskEditor.drawingNew) {
         maskEditor.dragging = false;
         maskEditor.resizing = false;
+        maskEditor.drawingNew = false;
+        
+        // Auto-keyframe: update existing frame silently
+        if (maskEditor.keyframes[maskEditor.currentFrame]) {
+            maskEditor.keyframes[maskEditor.currentFrame] = { ...maskEditor.current };
+        }
+        _renderMaskOverlay();
     }
 });
 
