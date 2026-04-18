@@ -635,13 +635,15 @@ function _getMaskParams() {
         pixel_art: $('mask-pixel-art').checked
     };
 }
+$('luma-threshold').oninput = function() { $('val-luma-thresh').textContent = this.value; };
 
 $('btn-bg-dark').onclick = async () => {
     if (!currentImageB64) return;
-    log("Removing dark backgrounds...");
-    globalProgressShow("Removing dark pixels...", 50);
-    const res = await eel.remove_background(currentImageB64, "dark", 30, {})();
-    if (res.success) { saveUndoState(); updateCanvas(res.image); log("Dark-pixel background removed."); }
+    log("Applying VFX Unmultiply (Luma Key)...");
+    globalProgressShow("Extracting glows...", 50);
+    const thresh = parseInt($('luma-threshold').value) || 15;
+    const res = await eel.remove_background(currentImageB64, "dark", thresh, {})();
+    if (res.success) { saveUndoState(); updateCanvas(res.image); log("Unmultiply (Luma Key) applied successfully."); }
     else logError(res.error);
     globalProgressDone();
 };

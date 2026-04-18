@@ -626,11 +626,18 @@ def remove_background(image_base64, method="dark", threshold=30, mask_params=Non
             arr = np.array(img).astype(np.float32)
             rgb = arr[:, :, :3]
             
-            # Alpha is determined by the brightest color channel
-            alpha = np.max(rgb, axis=2)
+            # 1. Base Alpha is determined by the brightest color channel
+            base_alpha = np.max(rgb, axis=2)
             
+            # 2. Apply Black Clip Threshold
+            # Remaps the alpha so that anything below `threshold` becomes 0 (fully transparent), 
+            # and scales the rest perfectly to 255. This deletes noise while keeping soft transitions!
+            safe_range = max(1.0, 255.0 - threshold)
+            alpha = np.clip((base_alpha - threshold), 0, 255) * (255.0 / safe_range)
+            
+            # 3. Un-premultiply RGB using the ORIGINAL base_alpha to avoid color shifting
             # Avoid divide-by-zero on pure black pixels by clamping divisor
-            alpha_safe = np.where(alpha == 0, 1.0, alpha)
+            alpha_safe = np.where(base_alpha == 0, 1.0, base_alpha)
             
             # Un-premultiply the RGB channels to restore original vividness
             # when rendered with the new soft alpha mask.
