@@ -572,11 +572,24 @@ document.querySelectorAll('.preset-chip').forEach(chip => {
 // ============================================
 //  BACKGROUND REMOVAL
 // ============================================
+// ---- Mask Refinement Slider Badges ----
+$('mask-threshold').oninput = function() { $('val-mask-thresh').textContent = this.value; };
+$('edge-refine').oninput = function() { $('val-edge-refine').textContent = this.value; };
+$('feather-radius').oninput = function() { $('val-feather').textContent = this.value; };
+
+function _getMaskParams() {
+    return {
+        threshold: parseInt($('mask-threshold').value) || 128,
+        edge_strength: parseInt($('edge-refine').value) || 1,
+        feather: parseInt($('feather-radius').value) || 0
+    };
+}
+
 $('btn-bg-dark').onclick = async () => {
     if (!currentImageB64) return;
     log("Removing dark backgrounds...");
     globalProgressShow("Removing dark pixels...", 50);
-    const res = await eel.remove_background(currentImageB64, "dark", 30)();
+    const res = await eel.remove_background(currentImageB64, "dark", 30, {})();
     if (res.success) { saveUndoState(); updateCanvas(res.image); log("Dark-pixel background removed."); }
     else logError(res.error);
     globalProgressDone();
@@ -586,13 +599,13 @@ $('btn-bg-ai').onclick = async () => {
     if (!currentImageB64) return;
     log("Running AI Background Removal (Rembg)... First run downloads the model (~170 MB).");
     globalProgressShow("AI Background Removal in progress...", 15);
-    // Simulate incremental progress for long-running AI task
     let fakePct = 15;
     const ticker = setInterval(() => {
         fakePct = Math.min(fakePct + 2, 90);
         globalProgressUpdate(fakePct, "AI Background Removal in progress...");
     }, 800);
-    const res = await eel.remove_background(currentImageB64, "rembg", 30)();
+    const params = _getMaskParams();
+    const res = await eel.remove_background(currentImageB64, "rembg", 30, params)();
     clearInterval(ticker);
     if (res.success) { saveUndoState(); updateCanvas(res.image); log("AI background removal complete."); }
     else logError(res.error);
@@ -608,9 +621,9 @@ $('btn-bg-biref').onclick = async () => {
         fakePct = Math.min(fakePct + 1, 95);
         globalProgressUpdate(fakePct, "Pro AI Segmentation in progress...");
     }, 1000);
-    
-    // Calls specific BiRefNet route
-    const res = await eel.remove_background(currentImageB64, "birefnet", 30)();
+
+    const params = _getMaskParams();
+    const res = await eel.remove_background(currentImageB64, "birefnet", 30, params)();
     clearInterval(ticker);
     if (res.success) { saveUndoState(); updateCanvas(res.image); log("Pro AI background removal complete."); }
     else logError(res.error);

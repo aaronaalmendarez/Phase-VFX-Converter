@@ -430,7 +430,7 @@ def _get_rembg_session(model_name="u2net"):
     return _get_cached_model_session(f"rembg:{model_name}", factory)
 
 
-def run_birefnet_onnx(img):
+def run_birefnet_onnx(img, mask_params=None):
     from huggingface_hub import hf_hub_download
     import huggingface_hub.file_download as fd
     
@@ -504,18 +504,40 @@ def run_birefnet_onnx(img):
     # Crop the padded region back to the actual image area
     pred = pred[pad_top:pad_top + new_h, pad_left:pad_left + new_w]
 
-    # ── Morphological cleanup (tuned for VFX/particles) ──
-    # Particles, smoke, and glow effects often have semi-transparent edges
-    # and small holes that the model under-segments.
+    # ── Apply mask refinement parameters ──
+    if mask_params is None:
+        mask_params = {}
+    thresh_val = mask_params.get("threshold", 128)
+    edge_strength = mask_params.get("edge_strength", 1)
+    feather = mask_params.get("feather", 0)
+
+    # Convert sigmoid [0,1] to uint8, then apply threshold
+    # Lower threshold = keep more soft detail (smoke, glow)
+    # thresh_val 0 = keep everything, 255 = keep only the strongest segments
     mask_u8 = (pred * 255.0).clip(0, 255).astype(np.uint8)
 
-    # Closing: fill small holes inside particle/glow regions
-    kernel_close = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-    mask_u8 = cv2.morphologyEx(mask_u8, cv2.MORPH_CLOSE, kernel_close, iterations=1)
+    # Apply binary threshold: pixels below thresh_val/2 become 0,
+    # pixels above become proportional. This preserves soft edges
+    # while cutting weak background predictions.
+    cutoff = max(1, thresh_val // 2)
+    mask_u8 = np.where(mask_u8 < cutoff, 0, mask_u8).astype(np.uint8)
 
-    # Opening: remove tiny noise dots in the background
-    kernel_open = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2, 2))
-    mask_u8 = cv2.morphologyEx(mask_u8, cv2.MORPH_OPEN, kernel_open, iterations=1)
+    # ── Morphological cleanup (controlled by edge_strength) ──
+    if edge_strength > 0:
+        # Closing: fill small holes inside particle/glow regions
+        k_size = 1 + edge_strength * 2  # 3, 5, 7, 9, 11
+        kernel_close = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k_size, k_size))
+        mask_u8 = cv2.morphologyEx(mask_u8, cv2.MORPH_CLOSE, kernel_close, iterations=1)
+
+        # Opening: remove tiny noise dots in the background
+        k_open = max(1, edge_strength)
+        kernel_open = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k_open, k_open))
+        mask_u8 = cv2.morphologyEx(mask_u8, cv2.MORPH_OPEN, kernel_open, iterations=1)
+
+    # ── Feather (Gaussian blur on mask edges) ──
+    if feather > 0:
+        blur_size = feather * 2 + 1  # must be odd: 1,3,5,7,...,21
+        mask_u8 = cv2.GaussianBlur(mask_u8, (blur_size, blur_size), 0)
 
     # Resize mask back to original dimensions (LANCZOS for sharp edges)
     mask_img = Image.fromarray(mask_u8, mode="L")
@@ -536,11 +558,14 @@ def run_birefnet_onnx(img):
     return result
 
 @eel.expose
-def remove_background(image_base64, method="dark", threshold=30):
+def remove_background(image_base64, method="dark", threshold=30, mask_params=None):
     try:
         header, encoded = image_base64.split(",", 1)
         img = Image.open(io.BytesIO(base64.b64decode(encoded))).convert("RGBA")
         
+        if mask_params is None:
+            mask_params = {}
+
         eel.update_progress(0, 1, f"Running {method} bg removal...")
         if method == "rembg":
             from rembg import remove as rembg_remove
@@ -550,7 +575,7 @@ def remove_background(image_base64, method="dark", threshold=30):
             eel.update_progress(0, 1, f"Running rembg on {execution_target}...")
             img = rembg_remove(img, session=session)
         elif method == "birefnet":
-            img = run_birefnet_onnx(img)
+            img = run_birefnet_onnx(img, mask_params=mask_params)
         else: # "dark"
             arr = np.array(img)
             # Calculate luminance: 0.299*R + 0.587*G + 0.114*B
