@@ -412,6 +412,26 @@ document.querySelector('.anim-modal-bg').onclick = closeModal;
 $('btn-browse-image').onclick = async () => {
     const filepath = await eel.open_file_dialog("image")();
     if (!filepath) return;
+
+    // Auto-route GIFs to video extractor
+    if (filepath.toLowerCase().endsWith('.gif') || filepath.toLowerCase().endsWith('.mp4')) {
+        log("Animated format detected, extracting frames to spritesheet...");
+        showProgress();
+        const frames = parseInt($('video-frames').value) || 64;
+        const cols   = parseInt($('grid-cols').value) || 8;
+        const res = await eel.video_to_spritesheet(filepath, frames, cols)();
+        if (res.success) {
+            originalImageB64 = res.image;
+            updateCanvas(res.image);
+            $('grid-rows').value = Math.ceil(frames / cols);
+            log("Animated file converted to spritesheet.");
+        } else {
+            logError(res.error);
+        }
+        hideProgress(1500);
+        return;
+    }
+
     log("Loading image...");
     const res = await eel.load_local_image(filepath)();
     if (res.success) {
@@ -466,12 +486,36 @@ mainContent.addEventListener('drop', async e => {
 
     log(`Dropped file: ${file.name}`);
 
-    // Read the file as base64 and send to canvas
+    const isAnim = file.name.toLowerCase().endsWith('.gif') || file.type.startsWith('video/');
+
+    if (isAnim) {
+        log("Animated file dropped. Processing into spritesheet...");
+        showProgress();
+        const reader = new FileReader();
+        reader.onload = async () => {
+            const frames = parseInt($('video-frames').value) || 64;
+            const cols   = parseInt($('grid-cols').value) || 8;
+            const res = await eel.video_b64_to_spritesheet(reader.result, frames, cols, file.name)();
+            if (res.success) {
+                originalImageB64 = res.image;
+                updateCanvas(res.image);
+                $('grid-rows').value = Math.ceil(frames / cols);
+                log("Dropped animation converted to spritesheet.");
+            } else {
+                logError(res.error);
+            }
+            hideProgress(1500);
+        };
+        reader.readAsDataURL(file);
+        return;
+    }
+
+    // Read the file as base64 and send to canvas (static images)
     const reader = new FileReader();
     reader.onload = () => {
         originalImageB64 = reader.result;
         updateCanvas(reader.result);
-        log("Drag-and-drop image loaded.");
+        log("Drag-and-drop static image loaded.");
     };
     reader.readAsDataURL(file);
 });

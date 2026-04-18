@@ -182,6 +182,33 @@ def video_to_spritesheet(filepath, max_frames=64, cols=8):
         return {"success": False, "error": str(e)}
 
 @eel.expose
+def video_b64_to_spritesheet(b64_data, max_frames=64, cols=8, filename="temp.mp4"):
+    import tempfile
+    import os
+    try:
+        header, encoded = b64_data.split(",", 1)
+        file_bytes = base64.b64decode(encoded)
+        
+        # Determine extension from filename to parse correctly (gif vs mp4)
+        ext = os.path.splitext(filename)[1]
+        if not ext: ext = ".mp4"
+            
+        with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as temp_vid:
+            temp_path = temp_vid.name
+            temp_vid.write(file_bytes)
+            
+        res = video_to_spritesheet(temp_path, max_frames, cols)
+        
+        try:
+            os.remove(temp_path)
+        except:
+            pass
+            
+        return res
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@eel.expose
 def dissect_spritesheet(image_base64, cols, rows):
     try:
         header, encoded = image_base64.split(",", 1)
