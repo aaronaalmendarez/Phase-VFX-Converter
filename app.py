@@ -141,22 +141,37 @@ def assemble_images_to_b64(pil_images, cols):
 def video_to_spritesheet(filepath, max_frames=64, cols=8):
     try:
         eel.update_progress(0, 1, "Reading video data...")
-        cap = cv2.VideoCapture(filepath)
-        total_frames_in_video = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        if total_frames_in_video <= 0:
-            return {"success": False, "error": "Could not read video or video is empty."}
-            
-        step = max(1, total_frames_in_video // max_frames)
         frames = []
-        for i in range(max_frames):
-            cap.set(cv2.CAP_PROP_POS_FRAMES, i * step)
-            ret, frame = cap.read()
-            if not ret: break
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            frames.append(Image.fromarray(frame).convert("RGBA"))
-            eel.update_progress(i, max_frames, f"Extracting frame {i}/{max_frames}...")
+        if filepath.lower().endswith('.gif'):
+            from PIL import ImageSequence
+            gif = Image.open(filepath)
+            seq = [frame.copy().convert("RGBA") for frame in ImageSequence.Iterator(gif)]
+            total_frames_in_video = len(seq)
+            if total_frames_in_video <= 0:
+                return {"success": False, "error": "Could not read GIF or GIF is empty."}
             
-        cap.release()
+            step = max(1, total_frames_in_video // max_frames)
+            for i in range(min(max_frames, total_frames_in_video)):
+                idx = i * step
+                if idx >= len(seq): break
+                frames.append(seq[idx])
+                eel.update_progress(i, max_frames, f"Extracting GIF frame {i}/{total_frames_in_video}...")
+        else:
+            cap = cv2.VideoCapture(filepath)
+            total_frames_in_video = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            if total_frames_in_video <= 0:
+                return {"success": False, "error": "Could not read video or video is empty."}
+                
+            step = max(1, total_frames_in_video // max_frames)
+            for i in range(max_frames):
+                # Using cap.set is slow but fine for small videos
+                cap.set(cv2.CAP_PROP_POS_FRAMES, i * step)
+                ret, frame = cap.read()
+                if not ret: break
+                frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                frames.append(Image.fromarray(frame).convert("RGBA"))
+                eel.update_progress(i, max_frames, f"Extracting video frame {i}/{max_frames}...")
+            cap.release()
         
         if not frames:
             return {"success": False, "error": "No frames could be extracted."}
